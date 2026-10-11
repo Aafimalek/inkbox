@@ -326,8 +326,6 @@ impl ForwardingTargetType {
 #[serde(rename_all = "snake_case")]
 pub enum CallForwardingTrigger {
     IncomingAction,
-    LiveTransfer,
-    LiveConference,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1129,7 +1127,12 @@ mod tests {
     }
 
     #[test]
-    fn phone_call_preserves_mixed_operation_history() {
+    fn phone_call_preserves_incoming_forwarding_history() {
+        // Downstream exhaustive matches on the legacy enum remain source-compatible.
+        let label = match CallForwardingTrigger::IncomingAction {
+            CallForwardingTrigger::IncomingAction => "Incoming forwarding",
+        };
+        assert_eq!(label, "Incoming forwarding");
         let history: serde_json::Value = serde_json::from_str(include_str!(
             "../../../../tests/fixtures/call_forwardings.json"
         ))
@@ -1144,8 +1147,6 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![
                 CallForwardingTrigger::IncomingAction,
-                CallForwardingTrigger::LiveTransfer,
-                CallForwardingTrigger::LiveConference
             ]
         );
         assert_eq!(serde_json::to_value(&call.forwardings).unwrap(), history);

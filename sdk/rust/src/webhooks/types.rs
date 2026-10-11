@@ -1385,7 +1385,7 @@ mod tests {
     }
 
     #[test]
-    fn call_ended_preserves_mixed_operation_history() {
+    fn call_ended_preserves_incoming_forwarding_history() {
         let mut payload: serde_json::Value = serde_json::from_str(include_str!(
             "../../../../tests/fixtures/webhook_payloads/call_ended_hosted.json"
         ))
@@ -1405,8 +1405,6 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![
                 crate::phone::CallForwardingTrigger::IncomingAction,
-                crate::phone::CallForwardingTrigger::LiveTransfer,
-                crate::phone::CallForwardingTrigger::LiveConference
             ]
         );
     }

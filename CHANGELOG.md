@@ -18,6 +18,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
+- Keep the legacy forwarding trigger enum unchanged, including exhaustive matches.
 - Prefer `connections` when supplied, even when empty; use legacy `forwardings`
   only when the field is absent. Legacy history includes only automatic incoming
   forwarding; live transfers and conference guests appear only in `connections`.

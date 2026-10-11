@@ -1,14 +1,15 @@
-// sdk/typescript/tests/fixtures/call-forwarding-triggers.ts
+// Existing exhaustive consumers must still compile unchanged.
 import { CallForwardingTrigger, type WebhookPhoneCallForwarding } from "../../src/index.js";
 
-const wireTriggers: WebhookPhoneCallForwarding["trigger"][] = [
-  "incoming_action", "live_transfer", "live_conference",
-];
-const triggers: CallForwardingTrigger[] = [
-  CallForwardingTrigger.INCOMING_ACTION,
-  CallForwardingTrigger.LIVE_TRANSFER,
-  CallForwardingTrigger.LIVE_CONFERENCE,
-];
-
-void wireTriggers;
-void triggers;
+const wireTrigger: WebhookPhoneCallForwarding["trigger"] = "incoming_action";
+function legacyTriggerLabel(trigger: CallForwardingTrigger): string {
+  switch (trigger) {
+    case CallForwardingTrigger.INCOMING_ACTION: return "Incoming forwarding";
+    default: {
+      const exhaustive: never = trigger;
+      return exhaustive;
+    }
+  }
+}
+void wireTrigger;
+void legacyTriggerLabel;

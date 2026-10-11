@@ -239,14 +239,12 @@ class TestPhoneCallParsing:
 
 
 class TestPhoneCallWithRateLimitParsing:
-    def test_mixed_call_operation_history_preserves_every_trigger(self):
+    def test_incoming_forwarding_history_preserves_trigger(self):
         path = Path(__file__).resolve().parents[3] / "tests/fixtures/call_forwardings.json"
         history = json.loads(path.read_text())
         call = PhoneCall._from_dict({**PHONE_CALL_DICT, "forwardings": history})
         assert [attempt.trigger for attempt in call.forwardings] == [
             CallForwardingTrigger.INCOMING_ACTION,
-            CallForwardingTrigger.LIVE_TRANSFER,
-            CallForwardingTrigger.LIVE_CONFERENCE,
         ]
         assert [attempt.id for attempt in call.forwardings] == [UUID(item["id"]) for item in history]
 

@@ -697,7 +697,7 @@ export interface WebhookPhoneCallConnection {
 
 export interface WebhookPhoneCallForwarding {
   id: string;
-  trigger: "incoming_action" | "live_transfer" | "live_conference";
+  trigger: "incoming_action";
   status: "requested" | "dialing" | "forwarded" | "failed";
   target_type: "phone" | "sip";
   target: string;

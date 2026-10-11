@@ -152,8 +152,6 @@ export enum ForwardingTargetType {
 
 export enum CallForwardingTrigger {
   INCOMING_ACTION = "incoming_action",
-  LIVE_TRANSFER = "live_transfer",
-  LIVE_CONFERENCE = "live_conference",
 }
 
 export enum CallForwardingStatus {
