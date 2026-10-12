@@ -22,9 +22,6 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Prefer `connections` when supplied, even when empty; use legacy `forwardings`
   only when the field is absent. Legacy history includes only automatic incoming
   forwarding; live transfers and conference guests appear only in `connections`.
-- Legacy call and webhook histories accept live-transfer and conference triggers.
-  Rust and TypeScript exhaustive matches on `CallForwardingTrigger` must handle
-  the additional live-transfer and conference variants accepted for older payloads.
 - **Source-breaking for Rust struct literals:** add `connections: None` to
   `PhoneCall`, `WebhookPhoneCall`, and `CallCorrespondenceItem`, and
   `phone_number: None` to `PhoneTranscript`, `WebhookTranscriptEntry`, and

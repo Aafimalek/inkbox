@@ -1403,9 +1403,7 @@ mod tests {
                 .iter()
                 .map(|attempt| attempt.trigger)
                 .collect::<Vec<_>>(),
-            vec![
-                crate::phone::CallForwardingTrigger::IncomingAction,
-            ]
+            vec![crate::phone::CallForwardingTrigger::IncomingAction,]
         );
     }
 

@@ -1145,9 +1145,7 @@ mod tests {
                 .iter()
                 .map(|attempt| attempt.trigger)
                 .collect::<Vec<_>>(),
-            vec![
-                CallForwardingTrigger::IncomingAction,
-            ]
+            vec![CallForwardingTrigger::IncomingAction,]
         );
         assert_eq!(serde_json::to_value(&call.forwardings).unwrap(), history);
     }
