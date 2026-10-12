@@ -33,6 +33,7 @@ import time
 from contextlib import suppress
 from contextvars import ContextVar
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Any, Callable, Literal, NoReturn
 from uuid import UUID
 
@@ -107,6 +108,9 @@ TCP_KEEPALIVE_INTERVAL_SECONDS = 10
 TCP_KEEPALIVE_PROBE_COUNT = 3
 BACKOFF_CAP = 30.0
 BACKOFF_JITTER = 0.25  # +- 25%
+# Bound a peer-provided delay without losing it when a handoff falls back
+# to cold reconnect. Shutdown can interrupt the wait.
+MAX_RETRY_AFTER_SEC = 60.0
 
 # Budget for re-dialing the replacement connection during a handoff. The
 # server may bounce the first hello while it drains (the NLB can land us
@@ -349,6 +353,7 @@ class TunnelRuntime:
 
         self._status_lock = threading.Lock()
         self._status: TunnelRuntimeStatus = "idle"
+        self._retry_not_before = 0.0
         self._last_connected_at: datetime | None = None
 
         # httpx.AsyncClient for URL forwarding + body-uri GETs. Lazily
@@ -590,13 +595,22 @@ class TunnelRuntime:
                 self._notify_status("closed")
                 return
             jitter = backoff * BACKOFF_JITTER * (2 * random.random() - 1)
-            sleep_for = max(0.1, backoff + jitter)
+            sleep_for = max(
+                0.1, backoff + jitter,
+                self._retry_not_before - time.monotonic(),
+            )
             try:
-                await asyncio.sleep(sleep_for)
+                await self._sleep_before_retry(sleep_for)
             except asyncio.CancelledError:
                 self._notify_status("closed")
                 raise
             backoff = min(backoff * 2, BACKOFF_CAP)
+
+    async def _sleep_before_retry(self, delay: float) -> None:
+        try:
+            await asyncio.wait_for(self._stop.wait(), timeout=delay)
+        except asyncio.TimeoutError:
+            pass
 
     # --- connection lifecycle -----------------------------------------------
 
@@ -808,6 +822,7 @@ class TunnelRuntime:
         self._handoff_terminal_error = None
         self._last_handoff_at = time.monotonic()
         old_conn.draining = True
+        self._notify_status("reconnecting")
         old_conn.bridge_close_code = WS_CLOSE_SERVER_DRAINING
         self._draining.add(old_conn)
         # The old h2 is CLOSED at GOAWAY; pinging it is meaningless.
@@ -819,7 +834,7 @@ class TunnelRuntime:
         try:
             new_conn = await self._make_replacement_connection()
             self._active = new_conn
-            self._record_connected(emit=False)
+            self._record_connected(emit=True)
             # Supervisor was watching old_conn; wake it to follow new.
             self._supervisor_wake.set()
         except asyncio.CancelledError:
@@ -917,7 +932,11 @@ class TunnelRuntime:
                 if remaining <= 0:
                     raise RuntimeError("handoff redial budget exhausted")
                 jitter = backoff * BACKOFF_JITTER * (2 * random.random() - 1)
-                await asyncio.sleep(min(max(0.05, backoff + jitter), remaining))
+                delay = max(
+                    0.05, backoff + jitter,
+                    self._retry_not_before - time.monotonic(),
+                )
+                await self._sleep_before_retry(min(delay, remaining))
                 backoff = min(backoff * 2, 5.0)
         raise RuntimeError("runtime stopped during handoff")
 
@@ -1175,7 +1194,7 @@ class TunnelRuntime:
             await self._flush_conn(conn)
 
         try:
-            status, body = await self._await_response(stream_id, conn=conn)
+            status, body, response_headers = await self._await_response(stream_id, conn=conn)
         finally:
             conn.streams.pop(stream_id, None)
         if status in (401, 403):
@@ -1194,6 +1213,17 @@ class TunnelRuntime:
                 "another client connected to this tunnel during hello",
             )
         if status != 200:
+            retry_after = _parse_retry_after(_first_header(response_headers, "retry-after"))
+            if retry_after is not None:
+                # Jitter above the server's floor, once per response, so a
+                # common retry hint does not synchronize reconnecting clients.
+                retry_after = min(
+                    MAX_RETRY_AFTER_SEC,
+                    retry_after * (1 + BACKOFF_JITTER * random.random()),
+                )
+                self._retry_not_before = max(
+                    self._retry_not_before, time.monotonic() + retry_after,
+                )
             raise RuntimeError(
                 f"/_system/hello returned {status}; transient — will retry",
             )
@@ -1210,6 +1240,7 @@ class TunnelRuntime:
                 "intake streams without it",
             )
         conn.owner_token = str(owner_token)
+        self._retry_not_before = 0.0
         if isinstance(payload.get("default_pool_size"), int):
             conn.server_pool_size = int(payload["default_pool_size"])
         if (val := payload.get("intake_idle_seconds")) is not None:
@@ -1240,22 +1271,24 @@ class TunnelRuntime:
     async def _await_response_status(
         self, stream_id: int, conn: _Connection | None = None,
     ) -> int:
-        status, _ = await self._await_response(stream_id, conn=conn)
+        status, _, _headers = await self._await_response(stream_id, conn=conn)
         return status
 
     async def _await_response(
         self, stream_id: int, conn: _Connection | None = None,
-    ) -> tuple[int, bytes]:
+    ) -> tuple[int, bytes, list[tuple[str, str]]]:
         conn = conn if conn is not None else self._active
         assert conn is not None
         queue = conn.streams[stream_id]
         status: int = 0
         body = bytearray()
         got_headers = False
+        headers: list[tuple[str, str]] = []
         while True:
             event = await self._next_stream_event(conn, stream_id, queue)
             if event.kind == "headers" and not got_headers:
                 got_headers = True
+                headers = event.headers
                 status_str = next(
                     (v for k, v in event.headers if k == ":status"), "0",
                 )
@@ -1266,7 +1299,7 @@ class TunnelRuntime:
             elif event.kind == "data":
                 body.extend(event.data)
             elif event.kind in ("end", "reset"):
-                return status, bytes(body)
+                return status, bytes(body), headers
 
     # --- intake pool --------------------------------------------------------
 
@@ -3293,6 +3326,21 @@ class TunnelRuntime:
 
 class _BodyTooLarge(Exception):
     pass
+
+
+def _parse_retry_after(value: str | None) -> float | None:
+    if value is None:
+        return None
+    value = value.strip()
+    if value.isascii() and value.isdecimal():
+        return min(float(value), MAX_RETRY_AFTER_SEC)
+    try:
+        retry_at = parsedate_to_datetime(value)
+        if retry_at.tzinfo is None:
+            return None
+        return max(0.0, min(retry_at.timestamp() - time.time(), MAX_RETRY_AFTER_SEC))
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
 def _parse_reason_json(data: bytes | str | None) -> str | None:
