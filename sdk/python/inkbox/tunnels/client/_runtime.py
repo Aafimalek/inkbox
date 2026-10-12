@@ -3337,7 +3337,10 @@ def _parse_retry_after(value: str | None) -> float | None:
     try:
         retry_at = parsedate_to_datetime(value)
         if retry_at.tzinfo is None:
-            return None
+            # The obsolete asctime HTTP-date form has an implicit UTC zone.
+            retry_at = datetime.strptime(value, "%a %b %d %H:%M:%S %Y").replace(
+                tzinfo=timezone.utc,
+            )
         return max(0.0, min(retry_at.timestamp() - time.time(), MAX_RETRY_AFTER_SEC))
     except (TypeError, ValueError, OverflowError):
         return None

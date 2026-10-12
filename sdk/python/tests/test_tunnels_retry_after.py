@@ -28,6 +28,8 @@ from test_tunnels_reconnect import AbortableWriter, MinimalH2, _runtime
         ("0", 0.0), (" 5 ", 5.0), ("0005", 5.0),
         ("9" * 400, MAX_RETRY_AFTER_SEC),
         ("Wed, 21 Oct 2015 07:28:05 GMT", 5.0),
+        ("Wednesday, 21-Oct-15 07:28:05 GMT", 5.0),
+        ("Wed Oct 21 07:28:05 2015", 5.0),
         ("Wed, 21 Oct 2015 07:27:00 GMT", 0.0),
         ("Wed, 21 Oct 2099 07:28:00 GMT", MAX_RETRY_AFTER_SEC),
     ],
