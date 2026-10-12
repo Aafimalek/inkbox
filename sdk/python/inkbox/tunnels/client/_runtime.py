@@ -638,13 +638,16 @@ class TunnelRuntime:
                 raise _HelloTimeoutError(
                     f"hello timed out after {HELLO_TIMEOUT_SEC:.1f}s",
                 ) from exc
-            recovered = self.last_connected_at is not None
-            self._start_serving(conn)
-            self._record_connected(emit=True)
-            logger.info(
-                "tunnel runtime: %s connection established",
-                "recovered" if recovered else "initial",
-            )
+            # HELLO and GOAWAY/EOF can arrive before this waiter resumes.
+            # A handoff owns readiness once the original connection drains.
+            if conn is self._active and self._can_start_serving(conn):
+                recovered = self.last_connected_at is not None
+                self._start_serving(conn)
+                self._record_connected(emit=True)
+                logger.info(
+                    "tunnel runtime: %s connection established",
+                    "recovered" if recovered else "initial",
+                )
             # Supervise the active connection. A NO_ERROR GOAWAY swaps in
             # a fresh active out-of-band (make-before-break); follow it
             # without going through the backoff loop. Only a cold death
@@ -678,6 +681,17 @@ class TunnelRuntime:
                 )
         finally:
             await self._teardown_cold(conn)
+
+    def _can_start_serving(self, conn: _Connection) -> bool:
+        return (
+            not self._stop.is_set()
+            and not self._superseded
+            and not conn.draining
+            and not conn.goaway_received
+            and not conn.closed.is_set()
+            and conn.read_task is not None
+            and not conn.read_task.done()
+        )
 
     def _start_serving(self, conn: _Connection) -> None:
         """Spawn a connection's intake pool + ping loop."""
@@ -895,6 +909,8 @@ class TunnelRuntime:
                     self._send_hello(conn),
                     timeout=min(HELLO_TIMEOUT_SEC, remaining),
                 )
+                if not self._can_start_serving(conn):
+                    raise RuntimeError("replacement connection closed during hello")
                 self._start_serving(conn)
                 return conn
             except asyncio.CancelledError:

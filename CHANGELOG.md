@@ -14,6 +14,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Python listeners report `reconnecting` during a planned handoff and emit
   `connected` once the replacement is ready. Authentication rejection and
   supersession remain terminal without retries.
+- A successful Python tunnel HELLO immediately followed by GOAWAY or EOF no
+  longer starts serving or briefly restores readiness on a closed connection.
 
 ## 0.7.19 - Call connections and transcript attribution (unreleased)
 
