@@ -337,6 +337,41 @@ pub enum CallForwardingStatus {
     Failed,
 }
 
+/// Whether the caller is handed off or a guest joins the conversation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CallConnectionKind {
+    Handoff,
+    Conference,
+    /// A future value, preserved verbatim rather than treated as a known state.
+    #[serde(untagged)]
+    Unknown(String),
+}
+
+/// What initiated the destination connection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CallConnectionTrigger {
+    IncomingAction,
+    AgentTool,
+    /// A future value, preserved verbatim rather than treated as a known state.
+    #[serde(untagged)]
+    Unknown(String),
+}
+
+/// Connection progress, separate from the original call's status.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CallConnectionStatus {
+    Requested,
+    Dialing,
+    Connected,
+    Failed,
+    /// A future value, preserved verbatim rather than treated as a known state.
+    #[serde(untagged)]
+    Unknown(String),
+}
+
 /// Consent state of a receiver number for the calling org.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -562,6 +597,9 @@ pub struct PhoneCall {
     /// Forwarding attempts in chronological order.
     #[serde(default)]
     pub forwardings: Vec<PhoneCallForwarding>,
+    /// Prefer when present. None means an older response; Some([]) is authoritative.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connections: Option<Vec<PhoneCallConnection>>,
 }
 
 /// Rate limit snapshot for an organisation.
@@ -607,6 +645,26 @@ pub struct IncomingCallActionConfig {
     pub forwarding_phone_number: Option<String>,
     #[serde(default)]
     pub forwarding_sip_uri: Option<String>,
+}
+
+/// One handoff or conference attempt, returned oldest-first on the call.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhoneCallConnection {
+    pub id: Uuid,
+    pub kind: CallConnectionKind,
+    pub trigger: CallConnectionTrigger,
+    pub status: CallConnectionStatus,
+    pub target_type: ForwardingTargetType,
+    pub target: String,
+    pub requested_at: String,
+    #[serde(default)]
+    pub dialing_at: Option<String>,
+    #[serde(default)]
+    pub connected_at: Option<String>,
+    #[serde(default)]
+    pub ended_at: Option<String>,
+    #[serde(default)]
+    pub failure_code: Option<String>,
 }
 
 /// One attempt to forward a call, returned oldest-first on the call.
@@ -800,6 +858,9 @@ pub struct PhoneTranscript {
     pub party: String,
     pub text: String,
     pub created_at: String,
+    /// This turn's line number; None for shared local lines or unknown attribution.
+    #[serde(default)]
+    pub phone_number: Option<String>,
 }
 
 /// Execution state for a Voice AI tool invocation.
@@ -1063,6 +1124,30 @@ mod tests {
         assert!(back.get("call").is_none());
         assert_eq!(back["id"], v["id"]);
         assert_eq!(back["rate_limit"]["calls_limit"], 10);
+    }
+
+    #[test]
+    fn phone_call_preserves_incoming_forwarding_history() {
+        // Downstream exhaustive matches on the legacy enum remain source-compatible.
+        let label = match CallForwardingTrigger::IncomingAction {
+            CallForwardingTrigger::IncomingAction => "Incoming forwarding",
+        };
+        assert_eq!(label, "Incoming forwarding");
+        let history: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../tests/fixtures/call_forwardings.json"
+        ))
+        .unwrap();
+        let mut value = call_json();
+        value["forwardings"] = history.clone();
+        let call: PhoneCall = serde_json::from_value(value).unwrap();
+        assert_eq!(
+            call.forwardings
+                .iter()
+                .map(|attempt| attempt.trigger)
+                .collect::<Vec<_>>(),
+            vec![CallForwardingTrigger::IncomingAction,]
+        );
+        assert_eq!(serde_json::to_value(&call.forwardings).unwrap(), history);
     }
 
     #[test]
