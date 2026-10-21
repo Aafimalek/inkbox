@@ -9,7 +9,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Added
 
 - Personal iMessage line roles through Python `line_role`, TypeScript `lineRole`,
-  and Rust `line_role()`. These also work with older API responses.
+  and Rust `line_role()`. These models represent only personal lines, so the role
+  is always `"personal"`, including when the response omits `line_role`.
 
 ### Changed
 

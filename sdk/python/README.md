@@ -672,12 +672,12 @@ inkbox.sms_opt_ins.opt_out("+15551234567")
 
 ## iMessage
 
-Chat with humans over the shared iMessage router or a dedicated iMessage line.
+Chat with humans over the shared iMessage router or a personal iMessage line.
 iMessage is **opt-in per identity** (`imessage_enabled`). Shared service
-requires the human to message first. Dedicated lines may start new
+requires the human to message first. Personal lines may start new
 conversations, subject to consent, contact-rule, and rate-limit checks.
 
-Dedicated lines can also receive one-to-one messages from non-phone sender
+Personal lines can also receive one-to-one messages from non-phone sender
 addresses, such as `sender@example.com`. Read responses and `imessage.received`
 webhooks preserve the address as a string; do not normalize it into a phone number
 or assume every received message can be answered. These conversations are
@@ -740,7 +740,7 @@ identity.send_imessage(
     text="On it — give me two minutes.",
 )
 
-# A dedicated line can create or reuse an exact-participant group. Keep the
+# A personal line can create or reuse an exact-participant group. Keep the
 # returned conversation_id and use it for later replies. A best-known set that
 # matches multiple conversations returns 409 instead of choosing one.
 group = dedicated_identity.send_imessage(

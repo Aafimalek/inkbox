@@ -318,10 +318,10 @@ class IdentityPhoneNumber:
 
 @dataclass
 class IdentityIMessageNumber:
-    """Dedicated iMessage line attached to an agent identity.
+    """Personal iMessage line attached to an agent identity.
 
     The identity-detail wire shape is intentionally smaller than the
-    organization-level dedicated-line response: it contains no lifecycle
+    organization-level personal-line response: it contains no lifecycle
     status or attachment fields because attachment is implied by nesting.
     """
 
@@ -331,7 +331,7 @@ class IdentityIMessageNumber:
 
     @property
     def line_role(self) -> Literal["personal"]:
-        """The role of the line attached to this identity."""
+        """Always ``"personal"``; this model represents only personal lines."""
         return "personal"
 
     @classmethod

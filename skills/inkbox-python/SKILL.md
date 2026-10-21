@@ -475,9 +475,9 @@ inkbox.texts.update(phone.id, "text-uuid", status="deleted")
 
 ## iMessage
 
-iMessage can use the shared service or an organization-owned dedicated line. On shared service, recipients ask the triage number to connect them to `@agent_handle`; the shared local number is never exposed. Shared service requires the recipient to message first. A dedicated line may start a conversation, subject to consent, contact-rule, and rate-limit checks.
+iMessage can use the shared service or an organization-owned personal line. On shared service, recipients ask the triage number to connect them to `@agent_handle`; the shared local number is never exposed. Shared service requires the recipient to message first. A personal line may start a conversation, subject to consent, contact-rule, and rate-limit checks.
 
-Dedicated lines can also receive one-to-one messages from non-phone sender
+Personal lines can also receive one-to-one messages from non-phone sender
 addresses, such as `sender@example.com`. Read responses and `imessage.received`
 webhooks preserve the address as a string; do not normalize it into a phone number
 or assume every received message can be answered. These conversations are
@@ -504,7 +504,7 @@ identity.update(imessage_filter_mode="whitelist")
 print(identity.imessage_enabled, identity.imessage_filter_mode)
 ```
 
-Dedicated lines follow the phone-number resource style: list or claim them on
+Personal lines follow the phone-number resource style: list or claim them on
 the org-level iMessage resource, then inspect the typed number model. Claims
 require admin credentials.
 
@@ -521,7 +521,7 @@ separate attach call after an atomic claim. `imessage_number_id=None` is
 intentional wire data that moves an identity back to shared service; omitting
 the argument leaves its attachment unchanged.
 
-New identities default `contact_sharing_enabled=True`. When a dedicated line
+New identities default `contact_sharing_enabled=True`. When a personal line
 is attached, it automatically offers the identity's display name (or handle as
 fallback) and optional avatar. Pass `contact_sharing_enabled=False` during
 creation to opt out before the line is claimed, or update the identity later
@@ -567,7 +567,7 @@ group = dedicated_identity.send_imessage(
     text="Hello group",
     media_urls=["https://example.com/group-photo.jpg"],
     send_style=IMessageSendStyle.CONFETTI,
-)  # dedicated line only; 2–8 distinct recipients
+)  # personal line only; 2–8 distinct recipients
 group_reply = dedicated_identity.send_imessage(
     conversation_id=group.conversation_id,
     text="Group follow-up",

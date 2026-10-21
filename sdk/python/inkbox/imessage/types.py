@@ -134,7 +134,7 @@ def _dt(value: str | None) -> datetime | None:
 
 @dataclass
 class IMessageNumber:
-    """An organization-owned dedicated iMessage line.
+    """An organization-owned personal iMessage line.
 
     ``agent_identity_id`` and ``agent_handle`` are both ``None`` while the
     number is unattached. ``type`` is a fixed legacy wire field; it is not a
@@ -150,7 +150,7 @@ class IMessageNumber:
 
     @property
     def line_role(self) -> Literal["personal"]:
-        """The line's role, independent of the legacy compatibility field."""
+        """Always ``"personal"``; this model represents only personal lines."""
         return "personal"
 
     @classmethod
