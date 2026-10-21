@@ -493,9 +493,9 @@ await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
 
 ## iMessage
 
-iMessage can use shared service or an organization-owned dedicated line. Shared service requires the recipient to message first; a dedicated line can initiate one-to-one and group conversations, subject to server-side policy checks.
+iMessage can use shared service or an organization-owned personal line. Shared service requires the recipient to message first; a personal line can initiate one-to-one and group conversations, subject to server-side policy checks.
 
-Dedicated lines can also receive one-to-one messages from non-phone sender
+Personal lines can also receive one-to-one messages from non-phone sender
 addresses, such as `sender@example.com`. Read responses and `imessage.received`
 webhooks preserve the address as a string; do not normalize it into a phone number
 or assume every received message can be answered. These conversations are
@@ -524,7 +524,7 @@ console.log(identity.imessageEnabled, identity.imessageFilterMode);
 
 Messaging (identity convenience methods; `inkbox.imessages` is the org-level resource with the same operations plus `agentIdentityId` / `isBlocked` filters):
 
-New identities default `contactSharingEnabled: true`. When a dedicated line
+New identities default `contactSharingEnabled: true`. When a personal line
 is attached, it automatically offers the identity's display name (or handle as
 fallback) and optional avatar. Set `contactSharingEnabled: false` in the same
 create request as `claimIMessageNumber: true` to opt out before the line is
@@ -546,7 +546,7 @@ const group = await dedicatedIdentity.sendIMessage({
   text: "Hello group",
   mediaUrls: ["https://example.com/group-photo.jpg"],
   sendStyle: IMessageSendStyle.CONFETTI,
-}); // dedicated line only; 2–8 distinct recipients
+}); // personal line only; 2–8 distinct recipients
 const groupReply = await dedicatedIdentity.sendIMessage({
   conversationId: group.conversationId,
   text: "Group follow-up",

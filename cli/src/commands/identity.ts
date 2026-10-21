@@ -454,7 +454,7 @@ export function registerIdentityCommands(program: Command): void {
     )
     .option(
       "--contact-sharing-enabled <bool>",
-      "Share the identity's name and optional avatar from its dedicated iMessage line: true or false.",
+      "Share the identity's name and optional avatar from its personal iMessage line: true or false.",
     )
     .option(
       "--email-local-part <part>",
@@ -572,7 +572,7 @@ export function registerIdentityCommands(program: Command): void {
     .option("--description <text>", "New description (pass '' to clear)")
     .option("--clear-description", "Explicitly clear the description (sends null)", false)
     .option("--imessage-enabled <bool>", "Toggle identity-level iMessage reachability: true or false")
-    .option("--contact-sharing-enabled <bool>", "Toggle automatic name and optional photo sharing on a dedicated iMessage line: true or false")
+    .option("--contact-sharing-enabled <bool>", "Toggle automatic name and optional photo sharing on a personal iMessage line: true or false")
     .option("--imessage-filter-mode <mode>", "Alias for the shared phone and iMessage contact-rule mode (admin API key required)")
     .option("--mail-filter-mode <mode>", "Mail contact-rule mode: whitelist or blacklist (admin-only)")
     .option("--phone-filter-mode <mode>", "Shared phone and iMessage contact-rule mode: whitelist or blacklist (admin API key required)")

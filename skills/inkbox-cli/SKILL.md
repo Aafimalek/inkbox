@@ -132,7 +132,7 @@ inkbox identity refresh <handle>
 
 `identity create` atomically provisions the mailbox AND the tunnel. The JSON output includes both (`mailbox`, `tunnel.publicHost`, `tunnel.tlsMode`).
 
-New identities default contact sharing to enabled. If a dedicated iMessage
+New identities default contact sharing to enabled. If a personal iMessage
 line is attached, it automatically offers the identity's display name (or
 handle as fallback) and optional avatar. Use
 `--contact-sharing-enabled false` during identity creation to opt out, or

@@ -4,6 +4,19 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.20 - iMessage line roles (unreleased)
+
+### Added
+
+- Personal iMessage line roles through Python `line_role`, TypeScript `lineRole`,
+  and Rust `line_role()`. These models represent only personal lines, so the role
+  is always `"personal"`, including when the response omits `line_role`.
+
+### Changed
+
+- Use personal-line terminology in CLI help. Existing line methods, compatibility
+  fields, JSON fields, and Rust struct literals remain supported.
+
 ## 0.7.19 - Call connections and transcript attribution (unreleased)
 
 ### Added

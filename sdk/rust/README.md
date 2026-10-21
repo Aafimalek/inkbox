@@ -472,18 +472,19 @@ match inkbox.get_identity("unknown") {
 }
 ```
 
-### Dedicated iMessage lines
+### Personal iMessage lines
 
-List or claim organization-owned dedicated lines through the iMessage resource:
+List or claim personal iMessage lines through the iMessage resource:
 
 ```rust
 let available = inkbox.imessages().list_numbers()?;
 let number = inkbox
     .imessages()
     .claim_number("setup-support-number-v1")?;
+assert_eq!(number.line_role(), "personal");
 ```
 
-Dedicated lines can also receive one-to-one messages from non-phone sender
+Personal lines can also receive one-to-one messages from non-phone sender
 addresses, such as `sender@example.com`. Read responses and `imessage.received`
 webhooks preserve the address as a string; do not normalize it into a phone number
 or assume every received message can be answered. These conversations are
@@ -510,7 +511,7 @@ let identity = inkbox.create_identity_with_contact_sharing_and_imessage_number(
     Some(true),
 )?;
 
-let number = identity.imessage_number().expect("dedicated line");
+let number = identity.imessage_number().expect("personal line");
 assert_eq!(number.r#type, "dedicated_outbound");
 ```
 
@@ -521,7 +522,7 @@ idempotency key; reuse the same key after an ambiguous result. The response
 `type` remains `"dedicated_outbound"` for compatibility and is not a capability
 selector.
 
-Dedicated identities can also start group conversations. Scalar sends
+Identities with personal lines can also start group conversations. Scalar sends
 remain on `send_imessage`; groups use `send_imessage_group`, and later replies
 use the returned conversation id with `send_imessage`:
 

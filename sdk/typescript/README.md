@@ -754,12 +754,12 @@ await inkbox.smsOptIns.optOut("+15551234567");
 
 ## iMessage
 
-Chat with humans over the shared Inkbox router or a dedicated iMessage line.
+Chat with humans over the shared Inkbox router or a personal iMessage line.
 iMessage is **opt-in per identity** (`imessageEnabled`). On shared service, the
-human texts first. Dedicated lines may initiate conversations, subject to
+human texts first. Personal lines may initiate conversations, subject to
 consent and rate limits.
 
-Dedicated lines can also receive one-to-one messages from non-phone sender
+Personal lines can also receive one-to-one messages from non-phone sender
 addresses, such as `sender@example.com`. Read responses and `imessage.received`
 webhooks preserve the address as a string; do not normalize it into a phone number
 or assume every received message can be answered. These conversations are
@@ -826,11 +826,11 @@ await inkbox.imessageContactRules.create("my-agent", {
   matchTarget: "+15555550999",
 });
 
-// List every dedicated line owned by the organization. Unattached lines
+// List personal iMessage lines. Unattached lines
 // have null agentIdentityId and agentHandle fields.
 const numbers = await inkbox.imessages.listNumbers();
 for (const number of numbers) {
-  console.log(number.number, number.agentHandle);
+  console.log(number.number, number.lineRole, number.agentHandle);
 }
 
 // Claim an unattached number for the organization. Generate the key once and
@@ -860,7 +860,7 @@ const dedicatedIdentity = await inkbox.createIdentity("outreach-agent", {
 });
 console.log(dedicatedIdentity.imessageNumber?.number);
 
-// A dedicated line can create or reuse an exact-participant group. Keep
+// A personal line can create or reuse an exact-participant group. Keep
 // the returned conversationId for later replies. An ambiguous best-known match
 // returns 409 instead of choosing a conversation.
 const group = await dedicatedIdentity.sendIMessage({

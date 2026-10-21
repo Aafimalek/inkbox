@@ -2,7 +2,7 @@
 //!
 //! iMessage messages and conversations are keyed by `conversation_id`.
 //! One-to-one rows also expose assignment and remote-number state; group
-//! conversations instead expose participant snapshots. Dedicated line
+//! conversations instead expose participant snapshots. Personal line
 //! ownership is exposed separately through [`IMessageNumber`].
 
 use uuid::Uuid;
@@ -42,7 +42,7 @@ pub enum IMessageNumberStatus {
     Paused,
 }
 
-/// An organization-owned dedicated iMessage line.
+/// An organization-owned personal iMessage line.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IMessageNumber {
     pub id: Uuid,
@@ -60,7 +60,7 @@ pub struct IMessageNumber {
     pub agent_handle: Option<String>,
 }
 
-/// Dedicated iMessage line embedded in a detailed identity response.
+/// Personal iMessage line embedded in a detailed identity response.
 ///
 /// This shape is intentionally slimmer than [`IMessageNumber`]: attachment
 /// and lifecycle fields are only present on the organization number endpoints.
@@ -72,6 +72,20 @@ pub struct IdentityIMessageNumber {
     /// Fixed legacy wire field. This is not a capability selector.
     #[serde(deserialize_with = "deserialize_compatibility_number_type")]
     pub r#type: String,
+}
+
+impl IMessageNumber {
+    /// Always `"personal"`; this model represents only personal lines.
+    pub fn line_role(&self) -> &'static str {
+        "personal"
+    }
+}
+
+impl IdentityIMessageNumber {
+    /// Always `"personal"`; this model represents only personal lines.
+    pub fn line_role(&self) -> &'static str {
+        "personal"
+    }
 }
 
 /// Transport a message actually went over (iMessage may downgrade).

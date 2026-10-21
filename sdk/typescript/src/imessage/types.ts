@@ -90,7 +90,7 @@ export enum IMessageNumberStatus {
 }
 
 /**
- * An organization-owned dedicated iMessage line.
+ * An organization-owned personal iMessage line.
  *
  * Unattached numbers have both attachment fields set to `null`. `type` is a
  * fixed legacy wire field and is not a capability selector.
@@ -99,16 +99,20 @@ export interface IMessageNumber {
   id: string;
   number: string;
   type: "dedicated_outbound";
+  /** Always `"personal"` on parsed responses; this model is personal-only. */
+  lineRole?: "personal";
   status: IMessageNumberStatus;
   agentIdentityId: string | null;
   agentHandle: string | null;
 }
 
-/** Dedicated iMessage line embedded on a detailed identity response. */
+/** Personal iMessage line embedded on a detailed identity response. */
 export interface IdentityIMessageNumber {
   id: string;
   number: string;
   type: "dedicated_outbound";
+  /** Always `"personal"` on parsed responses; this model is personal-only. */
+  lineRole?: "personal";
 }
 
 /** Whether a matching remote number is allowed through or blocked. */
@@ -637,6 +641,7 @@ export function parseIMessageNumber(
     id: r.id,
     number: r.number,
     type: parseCompatibilityNumberType(r.type),
+    lineRole: "personal",
     status: r.status as IMessageNumberStatus,
     agentIdentityId: r.agent_identity_id,
     agentHandle: r.agent_handle,
@@ -650,6 +655,7 @@ export function parseIdentityIMessageNumber(
     id: r.id,
     number: r.number,
     type: parseCompatibilityNumberType(r.type),
+    lineRole: "personal",
   };
 }
 
