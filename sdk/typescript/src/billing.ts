@@ -1,0 +1,42 @@
+import type { HttpTransport } from "./_http.js";
+
+export interface CatalogRate {
+  code: string; name: string; kind: string; unit: string; currency: string;
+  published_amount: string; amount: string | null;
+  pricing_state: "published" | "priced" | "not_billed" | "unknown";
+}
+export interface PricingResponse { prices: CatalogRate[] }
+export interface CountryAgreement {
+  id: string; name: string; country_codes: string[]; monthly_amount: string; currency: string;
+  status: string; covered_through: string | null; cancel_at_period_end: boolean; change_pending: boolean; created_at: string;
+}
+export interface CallingCountry {
+  country_code: string; name: string; monthly_amount: string; currency: string; status: string; agreement_id: string | null;
+}
+export interface CallingCountriesResponse {
+  countries: CallingCountry[]; agreements: CountryAgreement[]; included_country_codes: string[];
+}
+export interface CountryQuote {
+  quote: string; expires_at: number; monthly_amount: string; country_amount_cents: number;
+  invoice_total_cents: number; amount_due_cents: number; currency: string; renewal_at: number | null;
+}
+
+/** Organization-admin billing. Decimal amounts and response field names preserve the API representation. */
+export class BillingResource {
+  constructor(private readonly http: HttpTransport) {}
+  pricing(): Promise<PricingResponse> { return this.http.get("/billing/pricing"); }
+  callingCountries(): Promise<CallingCountriesResponse> { return this.http.get("/billing/calling-countries"); }
+  quoteCountry(countryCode: string): Promise<CountryQuote> {
+    return this.http.post("/billing/calling-countries/quote", { country_code: countryCode });
+  }
+  /** Confirm the charge; reuse requestKey after an uncertain response. */
+  purchaseCountry(countryCode: string, options: { quote: string; requestKey: string }): Promise<CallingCountriesResponse> {
+    return this.http.post("/billing/calling-countries", { country_code: countryCode, quote: options.quote, request_key: options.requestKey });
+  }
+  cancelCountry(agreementId: string): Promise<CallingCountriesResponse> {
+    return this.http.post(`/billing/calling-countries/${encodeURIComponent(agreementId)}/cancel`, {});
+  }
+  resumeCountry(agreementId: string): Promise<CallingCountriesResponse> {
+    return this.http.post(`/billing/calling-countries/${encodeURIComponent(agreementId)}/resume`, {});
+  }
+}

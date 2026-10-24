@@ -4,6 +4,12 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.21
+
+### Added
+
+- Organization-admin billing resources in Python, TypeScript, and Rust, plus `inkbox billing` commands: read contracted usage rates, preview and purchase calling destinations, and cancel or resume renewals. Purchase retries reuse an explicit request key.
+
 ## 0.7.20 - iMessage line roles (unreleased)
 
 ### Added
