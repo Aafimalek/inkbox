@@ -160,14 +160,15 @@ export function inkbox(
   args: string,
   opts: { apiKey: string; baseUrl: string },
 ): string {
-  const cmd = `node ${CLI_BIN} --api-key "${opts.apiKey}" --base-url "${opts.baseUrl}" --json ${args}`;
+  // Pass the key through the environment; failed commands echo their command line.
+  const cmd = `node ${CLI_BIN} --base-url "${opts.baseUrl}" --json ${args}`;
 
   for (let attempt = 1; ; attempt++) {
     try {
       return execSync(cmd, {
         encoding: "utf-8",
         timeout: 60_000,
-        env: { ...process.env, NODE_NO_WARNINGS: "1" },
+        env: { ...process.env, NODE_NO_WARNINGS: "1", INKBOX_API_KEY: opts.apiKey },
       }).trim();
     } catch (err) {
       if (attempt === CLI_MAX_ATTEMPTS || !isConnectionError(err)) throw err;
