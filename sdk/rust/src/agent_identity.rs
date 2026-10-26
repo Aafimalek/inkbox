@@ -2222,6 +2222,9 @@ impl std::fmt::Debug for AgentIdentity {
 }
 
 impl AgentIdentity {
+    pub fn get_whatsapp_limits(&self) -> Result<crate::whatsapp::WhatsAppLimits> {
+        self.inkbox.whatsapp().get_limits(Some(&self.id()))
+    }
     pub fn get_whatsapp_status(&self) -> Result<Option<crate::whatsapp::WhatsAppChannelStatus>> {
         self.inkbox
             .identities()
