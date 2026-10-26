@@ -8,7 +8,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
-- Organization-admin billing resources in Python, TypeScript, and Rust, plus `inkbox billing` commands: read contracted usage rates, preview and purchase calling destinations, and cancel or resume renewals. Purchase retries reuse an explicit request key.
+- Organization-admin billing resources in Python, TypeScript, and Rust, plus `inkbox billing` commands: read contracted usage rates, preview and purchase calling destinations, and cancel or resume renewals. Purchase retries reuse an explicit request key. Select several destinations with `quote_countries` / `quoteCountries` and `purchase_countries` / `purchaseCountries`, or CLI `quote-many` / `purchase-many`, to pay on one invoice while keeping renewals independently cancelable.
 
 ## 0.7.20 - iMessage line roles (unreleased)
 

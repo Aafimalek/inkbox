@@ -24,3 +24,17 @@ def test_cancel_and_resume_use_the_existing_agreement():
     assert http.post.call_args.args == (f"/billing/calling-countries/{identifier}/cancel",)
     resource.resume_country(identifier)
     assert http.post.call_args.args == (f"/billing/calling-countries/{identifier}/resume",)
+
+
+def test_multiple_destinations_share_one_purchase_and_retry_identity():
+    http = MagicMock()
+    resource = BillingResource(http)
+    countries = ["FR", "JP"]
+    resource.quote_countries(countries)
+    http.post.assert_called_once_with("/billing/calling-countries/quote", json={"country_codes": countries})
+    http.post.reset_mock()
+    key = UUID("a3f22fcb-d805-4811-830c-2c61c3da5316")
+    for _ in range(2):
+        resource.purchase_countries(countries, quote="accepted", request_key=key)
+    assert http.post.call_args_list[0] == http.post.call_args_list[1]
+    assert http.post.call_args.kwargs["json"] == {"country_codes": countries, "quote": "accepted", "request_key": str(key)}

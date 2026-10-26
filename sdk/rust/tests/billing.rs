@@ -42,3 +42,48 @@ fn billing_keeps_decimal_rates_and_purchase_identity() {
     }
     purchase.assert_hits(2);
 }
+
+#[test]
+fn multiple_countries_share_one_purchase_request() {
+    let server = MockServer::start();
+    let client = Inkbox::builder("synthetic")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let quote = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/billing/calling-countries/quote")
+            .json_body(json!({"country_codes":["FR","JP"]}));
+        then.status(200)
+            .json_body(json!({"quote":"accepted", "expires_at":2000000000,
+            "monthly_amount":"75", "country_amount_cents":3750, "invoice_total_cents":3750,
+            "amount_due_cents":3750, "currency":"usd", "renewal_at":null}));
+    });
+    assert_eq!(
+        client
+            .billing()
+            .quote_countries(&["FR", "JP"])
+            .unwrap()
+            .amount_due_cents,
+        3750
+    );
+    quote.assert();
+    let request_key = Uuid::new_v4();
+    let purchase = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/billing/calling-countries")
+            .json_body(
+                json!({"country_codes":["FR","JP"], "quote":"accepted", "request_key":request_key}),
+            );
+        then.status(202).json_body(
+            json!({"countries":[], "agreements":[], "included_country_codes":["US","CA"]}),
+        );
+    });
+    for _ in 0..2 {
+        client
+            .billing()
+            .purchase_countries(&["FR", "JP"], "accepted", request_key)
+            .unwrap();
+    }
+    purchase.assert_hits(2);
+}

@@ -101,6 +101,26 @@ impl BillingResource {
             NO_QUERY,
         )?)?)
     }
+    pub fn quote_countries(&self, country_codes: &[&str]) -> Result<CountryQuote> {
+        Ok(serde_json::from_value(self.http.post(
+            "/billing/calling-countries/quote",
+            Some(&json!({"country_codes": country_codes})),
+            NO_QUERY,
+        )?)?)
+    }
+    /// Pay once for the selection, retaining request_key for retries.
+    pub fn purchase_countries(
+        &self,
+        country_codes: &[&str],
+        quote: &str,
+        request_key: Uuid,
+    ) -> Result<CallingCountriesResponse> {
+        Ok(serde_json::from_value(self.http.post(
+            "/billing/calling-countries",
+            Some(&json!({"country_codes": country_codes, "quote": quote, "request_key": request_key})),
+            NO_QUERY,
+        )?)?)
+    }
     pub fn cancel_country(&self, agreement_id: Uuid) -> Result<CallingCountriesResponse> {
         Ok(serde_json::from_value(self.http.post(
             &format!("/billing/calling-countries/{agreement_id}/cancel"),

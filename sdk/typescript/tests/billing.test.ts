@@ -18,3 +18,19 @@ it("keeps decimal and unknown prices and sends the same purchase identity", asyn
   expect(JSON.parse(String(requests[1][1].body))).toEqual({ country_code: "FR", quote: options.quote, request_key: options.requestKey });
   expect(requests[1][1].body).toBe(requests[2][1].body);
 });
+
+
+it("quotes and purchases multiple countries in one request with a stable retry key", async () => {
+  const fetch = vi.fn(async () => new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } }));
+  vi.stubGlobal("fetch", fetch);
+  const client = new Inkbox({ apiKey: "synthetic-test-key" });
+  await client.billing.quoteCountries(["FR", "JP"]);
+  const options = { quote: "accepted", requestKey: "a3f22fcb-d805-4811-830c-2c61c3da5316" };
+  await client.billing.purchaseCountries(["FR", "JP"], options);
+  await client.billing.purchaseCountries(["FR", "JP"], options);
+  const requests = fetch.mock.calls as unknown as [string, RequestInit][];
+  expect(requests[0][0]).toContain("/billing/calling-countries/quote");
+  expect(JSON.parse(String(requests[0][1].body))).toEqual({ country_codes: ["FR", "JP"] });
+  expect(JSON.parse(String(requests[1][1].body))).toEqual({ country_codes: ["FR", "JP"], quote: options.quote, request_key: options.requestKey });
+  expect(requests[1][1].body).toBe(requests[2][1].body);
+});

@@ -33,6 +33,13 @@ export class BillingResource {
   purchaseCountry(countryCode: string, options: { quote: string; requestKey: string }): Promise<CallingCountriesResponse> {
     return this.http.post("/billing/calling-countries", { country_code: countryCode, quote: options.quote, request_key: options.requestKey });
   }
+  quoteCountries(countryCodes: string[]): Promise<CountryQuote> {
+    return this.http.post("/billing/calling-countries/quote", { country_codes: countryCodes });
+  }
+  /** Pay once for all selected countries; retain requestKey for retries. */
+  purchaseCountries(countryCodes: string[], options: { quote: string; requestKey: string }): Promise<CallingCountriesResponse> {
+    return this.http.post("/billing/calling-countries", { country_codes: countryCodes, quote: options.quote, request_key: options.requestKey });
+  }
   cancelCountry(agreementId: string): Promise<CallingCountriesResponse> {
     return this.http.post(`/billing/calling-countries/${encodeURIComponent(agreementId)}/cancel`, {});
   }

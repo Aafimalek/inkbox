@@ -82,6 +82,16 @@ class BillingResource:
             "country_code": country_code, "quote": quote, "request_key": str(request_key),
         }))
 
+    def quote_countries(self, country_codes: list[str]) -> CountryQuote:
+        """Preview one invoice for all selected destinations."""
+        return cast(CountryQuote, self._http.post("/billing/calling-countries/quote", json={"country_codes": country_codes}))
+
+    def purchase_countries(self, country_codes: list[str], *, quote: str, request_key: UUID | str) -> CallingCountriesResponse:
+        """Pay once for the selection; reuse request_key after an uncertain response."""
+        return cast(CallingCountriesResponse, self._http.post("/billing/calling-countries", json={
+            "country_codes": country_codes, "quote": quote, "request_key": str(request_key),
+        }))
+
     def cancel_country(self, agreement_id: UUID | str) -> CallingCountriesResponse:
         """Stop renewal while retaining access through the paid-through date."""
         return cast(CallingCountriesResponse, self._http.post(f"/billing/calling-countries/{UUID(str(agreement_id))}/cancel", json={}))
