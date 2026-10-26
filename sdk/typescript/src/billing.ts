@@ -16,9 +16,13 @@ export interface CallingCountry {
 export interface CallingCountriesResponse {
   countries: CallingCountry[]; agreements: CountryAgreement[]; included_country_codes: string[];
 }
+export interface CountryQuoteLine {
+  country_code: string; name: string; monthly_amount: string; amount_cents: number;
+}
 export interface CountryQuote {
   quote: string; expires_at: number; monthly_amount: string; country_amount_cents: number;
   invoice_total_cents: number; amount_due_cents: number; currency: string; renewal_at: number | null;
+  items?: CountryQuoteLine[];
 }
 
 /** Organization-admin billing. Decimal amounts and response field names preserve the API representation. */

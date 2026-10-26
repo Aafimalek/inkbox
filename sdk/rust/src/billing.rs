@@ -51,6 +51,13 @@ pub struct CallingCountriesResponse {
     pub included_country_codes: Vec<String>,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CountryQuoteLine {
+    pub country_code: String,
+    pub name: String,
+    pub monthly_amount: String,
+    pub amount_cents: i64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CountryQuote {
     pub quote: String,
     pub expires_at: i64,
@@ -60,6 +67,8 @@ pub struct CountryQuote {
     pub amount_due_cents: i64,
     pub currency: String,
     pub renewal_at: Option<i64>,
+    #[serde(default)]
+    pub items: Vec<CountryQuoteLine>,
 }
 
 pub struct BillingResource {

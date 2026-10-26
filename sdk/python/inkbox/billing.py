@@ -1,6 +1,6 @@
 """Organization-admin pricing and calling-country subscriptions."""
 
-from typing import TYPE_CHECKING, Literal, TypedDict, cast
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -50,6 +50,13 @@ class CallingCountriesResponse(TypedDict):
     included_country_codes: list[str]
 
 
+class CountryQuoteLine(TypedDict):
+    country_code: str
+    name: str
+    monthly_amount: str
+    amount_cents: int
+
+
 class CountryQuote(TypedDict):
     quote: str
     expires_at: int
@@ -59,6 +66,7 @@ class CountryQuote(TypedDict):
     amount_due_cents: int
     currency: str
     renewal_at: int | None
+    items: NotRequired[list[CountryQuoteLine]]
 
 
 class BillingResource:
