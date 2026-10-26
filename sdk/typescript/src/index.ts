@@ -396,6 +396,7 @@ export type {
   SmsCorrespondenceItem,
   SlackCorrespondenceItem,
   IMessageCorrespondenceItem,
+  WhatsAppCorrespondenceItem,
   CallCorrespondenceItem,
   CreateContactOptions,
   ContactCreatePermissions,
@@ -545,3 +546,6 @@ export type {
   SlackCachedReaction,
   SlackCachedEmojiOptions,
 } from "./slack-cache.js";
+
+export * from "./whatsapp.js";
+export type {WhatsAppWebhookEventType,WhatsAppWebhookMessage,WhatsAppWebhookRecipient,WhatsAppWebhookMedia,WhatsAppWebhookData,WhatsAppWebhookPayload} from "./webhooks/types.js";
