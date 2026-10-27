@@ -24,7 +24,29 @@ class McpHeaderAuth(TypedDict):
     value_prefix: NotRequired[str]
 
 
-McpAuth = McpNoAuth | McpBearerAuth | McpHeaderAuth
+class McpOAuthAuth(TypedDict):
+    type: Literal["oauth"]
+    issuer: NotRequired[str]
+    scopes: NotRequired[list[str]]
+    client_id: NotRequired[str]
+    client_secret: NotRequired[str]
+    token_endpoint_auth_method: NotRequired[Literal["none", "client_secret_basic", "client_secret_post"]]
+    profile: NotRequired[Literal["standard", "offline_consent"]]
+
+
+McpAuth = McpNoAuth | McpBearerAuth | McpHeaderAuth | McpOAuthAuth
+
+
+class HostedMcpAuthorization(TypedDict):
+    id: str
+    connection_id: str
+    agent_identity_id: str
+    status: str
+    expires_at: str
+    connect_url: str | None
+    config_version: int | None
+    requested_scopes: list[str]
+    error_code: str | None
 
 
 class McpPromptSelection(TypedDict):

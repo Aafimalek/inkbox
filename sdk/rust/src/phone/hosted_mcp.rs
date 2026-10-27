@@ -16,6 +16,53 @@ pub enum McpAuth {
         header_name: String,
         value_prefix: String,
     },
+    #[serde(rename = "oauth")]
+    OAuth(McpOAuthAuth),
+}
+
+#[derive(Clone, Default, Serialize)]
+pub struct McpOAuthAuth {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scopes: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_secret: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_endpoint_auth_method: Option<McpOAuthClientAuthMethod>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile: Option<McpOAuthProfile>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum McpOAuthClientAuthMethod {
+    None,
+    ClientSecretBasic,
+    ClientSecretPost,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum McpOAuthProfile {
+    Standard,
+    OfflineConsent,
+}
+
+#[derive(Clone, Deserialize)]
+pub struct HostedMcpAuthorization {
+    pub id: Uuid,
+    pub connection_id: Uuid,
+    pub agent_identity_id: Uuid,
+    pub status: String,
+    pub expires_at: String,
+    pub connect_url: Option<String>,
+    pub config_version: Option<u32>,
+    #[serde(default)]
+    pub requested_scopes: Vec<String>,
+    pub error_code: Option<String>,
 }
 
 impl std::fmt::Debug for McpAuth {
@@ -98,6 +145,17 @@ pub struct HostedMcpAuthView {
     pub configured: bool,
     pub header_name: Option<String>,
     pub value_prefix: Option<String>,
+    pub status: Option<String>,
+    pub expires_at: Option<String>,
+    #[serde(default)]
+    pub refresh_supported: bool,
+    #[serde(default)]
+    pub requested_scopes: Vec<String>,
+    #[serde(default)]
+    pub granted_scopes: Vec<String>,
+    pub error_code: Option<String>,
+    pub issuer: Option<String>,
+    pub callback_uri: Option<String>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -160,6 +218,29 @@ pub struct HostedMcpActivityPage {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn oauth_serialization_preserves_auth_method_and_hides_debug_secret() {
+        let auth = McpAuth::OAuth(McpOAuthAuth {
+            client_id: Some("client".into()),
+            client_secret: Some("synthetic-secret".into()),
+            token_endpoint_auth_method: Some(McpOAuthClientAuthMethod::ClientSecretBasic),
+            scopes: vec!["read".into()],
+            ..Default::default()
+        });
+        assert_eq!(
+            serde_json::to_value(&auth).unwrap(),
+            serde_json::json!({
+                "type": "oauth", "client_id": "client", "client_secret": "synthetic-secret",
+                "token_endpoint_auth_method": "client_secret_basic", "scopes": ["read"]
+            })
+        );
+        assert!(!format!("{auth:?}").contains("synthetic-secret"));
+        let view: HostedMcpAuthView =
+            serde_json::from_value(serde_json::json!({"type": "future-auth", "configured": false}))
+                .unwrap();
+        assert_eq!(view.r#type, "future-auth");
+    }
 
     #[test]
     fn patch_omission_does_not_remove_grants() {

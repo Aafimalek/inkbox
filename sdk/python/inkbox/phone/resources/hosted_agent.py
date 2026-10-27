@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 from inkbox.phone.hosted_mcp import (
     HostedMcpActivityPage, HostedMcpCatalog, HostedMcpConnection, HostedMcpCreate,
-    HostedMcpTestResult, HostedMcpUpdate,
+    HostedMcpTestResult, HostedMcpUpdate, HostedMcpAuthorization,
 )
 
 from inkbox.phone.types import (
@@ -24,6 +24,26 @@ if TYPE_CHECKING:
 
 
 class HostedAgentConfigResource:
+
+    def start_mcp_authorization(self, connection_id: UUID | str, *, expected_version: int,
+                                idempotency_key: str) -> HostedMcpAuthorization:
+        """Request a browser connection URL requiring human approval."""
+        return self._http.post(f"/hosted-agent-config/mcp-servers/{UUID(str(connection_id))}/oauth/authorizations",
+            json={"expected_version": expected_version}, headers={"Idempotency-Key": idempotency_key})
+
+    def get_mcp_authorization(self, connection_id: UUID | str, transaction_id: UUID | str) -> HostedMcpAuthorization:
+        """Read authorization status without receiving external credentials."""
+        return self._http.get(f"/hosted-agent-config/mcp-servers/{UUID(str(connection_id))}/oauth/authorizations/{UUID(str(transaction_id))}")
+
+    def cancel_mcp_authorization(self, connection_id: UUID | str, transaction_id: UUID | str) -> None:
+        """Cancel an unfinished browser authorization."""
+        self._http.delete(f"/hosted-agent-config/mcp-servers/{UUID(str(connection_id))}/oauth/authorizations/{UUID(str(transaction_id))}")
+
+    def disconnect_mcp_server(self, connection_id: UUID | str, *, expected_version: int,
+                              idempotency_key: str) -> HostedMcpTestResult:
+        """Disconnect OAuth access while keeping connection settings."""
+        return self._http.post(f"/hosted-agent-config/mcp-servers/{UUID(str(connection_id))}/oauth/disconnect",
+            json={"expected_version": expected_version}, headers={"Idempotency-Key": idempotency_key})
 
     def __init__(self, http: HttpTransport) -> None:
         self._http = http

@@ -4,6 +4,18 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.22 - OAuth for Voice AI connections (unreleased)
+
+### Added
+
+- OAuth configuration and browser authorization start, status, cancel, and disconnect methods in Python, TypeScript, and Rust.
+- `inkbox phone hosted-agent mcp oauth` commands for browser approval and bounded status polling.
+- Connection authorization status, expiry, requested and granted scopes, and reconnect guidance.
+
+### Changed
+
+- Authentication views accept additional modes. Rust callers constructing `HostedMcpAuthView` directly must supply the new status fields, and exhaustive `McpAuth` matches must handle `OAuth`.
+
 ## 0.7.21 - Voice AI external connections (unreleased)
 
 ### Added

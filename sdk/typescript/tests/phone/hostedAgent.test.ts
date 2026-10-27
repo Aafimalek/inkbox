@@ -22,6 +22,38 @@ function mockHttp() {
 const IDENTITY_ID = "eeee5555-0000-0000-0000-000000000001";
 
 describe("MCP connection grants", () => {
+  it("serializes OAuth settings and parses browser authorization status", async () => {
+    const http = mockHttp();
+    const resource = new HostedAgentConfigResource(http);
+    vi.mocked(http.post).mockResolvedValue({ id: IDENTITY_ID, agent_identity_id: IDENTITY_ID,
+      label: "Calendar", url: "https://calendar.example/mcp", transport: "streamable_http",
+      auth: { type: "oauth", configured: false, status: "authorization_required", requested_scopes: ["read"] },
+      enabled: true, allowed_tools: null, context: {}, config_version: 1, preparation_status: "pending" });
+    const connection = await resource.createMcpServer({ label: "Calendar", url: "https://calendar.example/mcp",
+      auth: { type: "oauth", clientId: "client", clientSecret: "synthetic-secret", tokenEndpointAuthMethod: "client_secret_basic", scopes: ["read"] },
+    }, { idempotencyKey: "create" });
+    expect(JSON.parse(JSON.stringify(vi.mocked(http.post).mock.calls[0][1])).auth).toEqual({
+      type: "oauth", client_id: "client", client_secret: "synthetic-secret", token_endpoint_auth_method: "client_secret_basic", scopes: ["read"],
+    });
+    expect(connection.auth.requestedScopes).toEqual(["read"]);
+    expect(JSON.stringify(connection)).not.toContain("synthetic-secret");
+    const response = { id: IDENTITY_ID, connection_id: IDENTITY_ID, agent_identity_id: IDENTITY_ID, status: "pending",
+      expires_at: "2026-10-27T20:00:00Z", connect_url: "https://inkbox.ai/console/mcp-connections/oauth/connect",
+      config_version: null, requested_scopes: ["read"], error_code: null };
+    vi.mocked(http.post).mockResolvedValue(response);
+    const authorization = await resource.startMcpAuthorization(IDENTITY_ID, { expectedVersion: 1, idempotencyKey: "connect" });
+    expect(authorization.expiresAt).toEqual(new Date(response.expires_at));
+    expect(authorization.connectUrl).toEqual(response.connect_url);
+    expect(http.post).toHaveBeenLastCalledWith(`/hosted-agent-config/mcp-servers/${IDENTITY_ID}/oauth/authorizations`,
+      { expected_version: 1 }, { headers: { "Idempotency-Key": "connect" } });
+    vi.mocked(http.get).mockResolvedValue({ ...response, status: "completed", connect_url: null });
+    expect((await resource.getMcpAuthorization(IDENTITY_ID, IDENTITY_ID)).status).toBe("completed");
+    await resource.cancelMcpAuthorization(IDENTITY_ID, IDENTITY_ID);
+    expect(http.delete).toHaveBeenCalledWith(`/hosted-agent-config/mcp-servers/${IDENTITY_ID}/oauth/authorizations/${IDENTITY_ID}`);
+    vi.mocked(http.post).mockResolvedValue({ success: true, code: "disconnected", config_version: 2 });
+    expect(await resource.disconnectMcpServer(IDENTITY_ID, { expectedVersion: 2, idempotencyKey: "disconnect" }))
+      .toEqual({ success: true, code: "disconnected", configVersion: 2 });
+  });
   it("distinguishes omitted authentication and restrictions from explicit removal", async () => {
     const http = mockHttp();
     const resource = new HostedAgentConfigResource(http);

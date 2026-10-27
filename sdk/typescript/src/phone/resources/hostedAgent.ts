@@ -6,7 +6,8 @@
 
 import { HttpTransport } from "../../_http.js";
 import { HostedMcpCreate, HostedMcpUpdate, HostedMcpConnection, RawHostedMcpConnection,
-  HostedMcpCatalog, HostedMcpTestResult, HostedMcpActivityPage, mcpBody, parseHostedMcpConnection } from "../hostedMcp.js";
+  HostedMcpCatalog, HostedMcpTestResult, HostedMcpActivityPage, HostedMcpAuthorization, RawHostedMcpAuthorization,
+  mcpBody, parseHostedMcpConnection, parseHostedMcpAuthorization } from "../hostedMcp.js";
 import {
   HostedAgentAuthorityMode,
   HostedAgentConfig,
@@ -19,6 +20,29 @@ import {
 
 export class HostedAgentConfigResource {
   constructor(private readonly http: HttpTransport) {}
+
+  /** Request a browser connection URL requiring human approval. */
+  async startMcpAuthorization(id: string, options: { expectedVersion: number; idempotencyKey: string }): Promise<HostedMcpAuthorization> {
+    return parseHostedMcpAuthorization(await this.http.post<RawHostedMcpAuthorization>(
+      `/hosted-agent-config/mcp-servers/${encodeURIComponent(id)}/oauth/authorizations`,
+      { expected_version: options.expectedVersion }, { headers: { "Idempotency-Key": options.idempotencyKey } }));
+  }
+
+  async getMcpAuthorization(id: string, transactionId: string): Promise<HostedMcpAuthorization> {
+    return parseHostedMcpAuthorization(await this.http.get<RawHostedMcpAuthorization>(
+      `/hosted-agent-config/mcp-servers/${encodeURIComponent(id)}/oauth/authorizations/${encodeURIComponent(transactionId)}`));
+  }
+
+  async cancelMcpAuthorization(id: string, transactionId: string): Promise<void> {
+    await this.http.delete(`/hosted-agent-config/mcp-servers/${encodeURIComponent(id)}/oauth/authorizations/${encodeURIComponent(transactionId)}`);
+  }
+
+  async disconnectMcpServer(id: string, options: { expectedVersion: number; idempotencyKey: string }): Promise<HostedMcpTestResult> {
+    const r = await this.http.post<{ success: boolean; code: string; config_version: number }>(
+      `/hosted-agent-config/mcp-servers/${encodeURIComponent(id)}/oauth/disconnect`,
+      { expected_version: options.expectedVersion }, { headers: { "Idempotency-Key": options.idempotencyKey } });
+    return { success: r.success, code: r.code, configVersion: r.config_version };
+  }
 
   async listMcpServers(options?: { agentIdentityId?: string }): Promise<HostedMcpConnection[]> {
     const data = await this.http.get<{ connections: RawHostedMcpConnection[] }>("/hosted-agent-config/mcp-servers",

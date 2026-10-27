@@ -18,7 +18,8 @@ export async function readMcpBody(file: string): Promise<Record<string, unknown>
   }
   const result = body as Record<string, unknown>;
   checkFields(result, ["label", "url", "transport", "auth", "enabled", "allowedTools", "context", "expectedVersion"]);
-  if (result.auth !== undefined) checkFields(result.auth, ["type", "token", "headerName", "valuePrefix"]);
+  if (result.auth !== undefined) checkFields(result.auth, ["type", "token", "headerName", "valuePrefix", "issuer", "scopes",
+    "clientId", "clientSecret", "tokenEndpointAuthMethod", "profile"]);
   if (result.context !== undefined) {
     checkFields(result.context, ["prompts", "resources", "skills"]);
     const context = result.context as Record<string, unknown>;
@@ -40,6 +41,42 @@ function checkFields(value: unknown, fields: readonly string[]): void {
 
 export function registerPhoneMcpCommands(parent: Command): void {
   const mcp = parent.command("mcp").description("Manage Voice AI external connections (up to three per identity)");
+  const oauth = mcp.command("oauth").description("Connect external accounts through browser approval");
+  oauth.command("connect <id>").requiredOption("--expected-version <number>", "Current connection version")
+    .requiredOption("--idempotency-key <key>", "Reuse this key when retrying this request")
+    .option("--wait <seconds>", "Poll authorization for up to 600 seconds")
+    .action(withErrorHandler(async function (this: Command, id: string, args: { expectedVersion: string; idempotencyKey: string; wait?: string }) {
+      const opts = getGlobalOpts(this);
+      const expectedVersion = positiveInteger(args.expectedVersion, 2147483647);
+      const wait = args.wait === undefined ? 0 : positiveInteger(args.wait, 600);
+      const client = createClient(opts).hostedAgent;
+      let result = await client.startMcpAuthorization(id, { expectedVersion, idempotencyKey: args.idempotencyKey });
+      if (wait && result.connectUrl) process.stderr.write(`Open this URL to connect: ${result.connectUrl}\n`);
+      const deadline = Date.now() + wait * 1000;
+      while (Date.now() < deadline && ["pending", "launched", "exchanging"].includes(result.status)) {
+        await new Promise(resolve => setTimeout(resolve, Math.min(2000, deadline - Date.now())));
+        if (Date.now() >= deadline) break;
+        result = await client.getMcpAuthorization(id, result.id);
+      }
+      output(result, { json: !!opts.json });
+    }));
+  oauth.command("status <id> <transaction-id>").action(withErrorHandler(async function (this: Command, id: string, transactionId: string) {
+    const opts = getGlobalOpts(this);
+    output(await createClient(opts).hostedAgent.getMcpAuthorization(id, transactionId), { json: !!opts.json });
+  }));
+  oauth.command("cancel <id> <transaction-id>").action(withErrorHandler(async function (this: Command, id: string, transactionId: string) {
+    const opts = getGlobalOpts(this);
+    await createClient(opts).hostedAgent.cancelMcpAuthorization(id, transactionId);
+    output({ canceled: true }, { json: !!opts.json });
+  }));
+  oauth.command("disconnect <id>").requiredOption("--expected-version <number>", "Current connection version")
+    .requiredOption("--idempotency-key <key>", "Reuse this key when retrying disconnect")
+    .action(withErrorHandler(async function (this: Command, id: string, args: { expectedVersion: string; idempotencyKey: string }) {
+      const opts = getGlobalOpts(this);
+      output(await createClient(opts).hostedAgent.disconnectMcpServer(id, {
+        expectedVersion: positiveInteger(args.expectedVersion, 2147483647), idempotencyKey: args.idempotencyKey,
+      }), { json: !!opts.json });
+    }));
   mcp.command("list").requiredOption("-i, --identity <handle>", "Agent identity handle")
     .action(withErrorHandler(async function (this: Command, args: { identity: string }) {
       const opts = getGlobalOpts(this);
@@ -90,4 +127,11 @@ export function registerPhoneMcpCommands(parent: Command): void {
       const opts = getGlobalOpts(this);
       output(await createClient(opts).hostedAgent.getMcpActivity(callId, { offset: Number(args.offset) }), { json: !!opts.json });
     }));
+}
+
+function positiveInteger(value: string, maximum: number): number {
+  if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) > maximum) {
+    throw new Error(`Expected an integer between 1 and ${maximum}.`);
+  }
+  return Number(value);
 }

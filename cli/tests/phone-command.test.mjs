@@ -58,6 +58,40 @@ function help(...args) {
   });
 }
 
+test("OAuth commands preserve version fences and emit one JSON result while waiting", async () => {
+  const requests = [];
+  const authorization = { id: IDENTITY.id, connection_id: IDENTITY.id, agent_identity_id: IDENTITY.id,
+    status: "pending", expires_at: "2026-10-27T20:00:00Z", config_version: null, requested_scopes: ["read"],
+    connect_url: "https://inkbox.ai/console/mcp-connections/oauth/connect", error_code: null };
+  const mock = await listen(async (req, res) => {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    requests.push({ method: req.method, url: req.url, key: req.headers["idempotency-key"], body: body ? JSON.parse(body) : null });
+    if (req.method === "DELETE") { res.writeHead(204); res.end(); return; }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(req.url.endsWith("/disconnect") ? { success: true, code: "disconnected", config_version: 4 }
+      : req.method === "GET" ? { ...authorization, status: "completed", connect_url: null } : authorization));
+  });
+  const args = ["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json", "phone", "hosted-agent", "mcp", "oauth"];
+  try {
+    const result = await runCli([...args, "connect", IDENTITY.id, "--expected-version", "3", "--idempotency-key", "connect", "--wait", "5"]);
+    assert.ifError(result.error);
+    assert.equal(JSON.parse(result.stdout).status, "completed");
+    assert.match(result.stderr, /Open this URL/);
+    assert.deepEqual(requests[0].body, { expected_version: 3 });
+    assert.equal(requests[0].key, "connect");
+    assert.equal(requests.filter(r => r.method === "POST").length, 1);
+    for (const command of [["status", IDENTITY.id, IDENTITY.id], ["cancel", IDENTITY.id, IDENTITY.id],
+      ["disconnect", IDENTITY.id, "--expected-version", "4", "--idempotency-key", "disconnect"]]) {
+      assert.ifError((await runCli([...args, ...command])).error);
+    }
+    assert.equal(requests.at(-1).key, "disconnect");
+    const count = requests.length;
+    assert.ok((await runCli([...args, "connect", IDENTITY.id, "--expected-version", "0", "--idempotency-key", "bad"])).error);
+    assert.equal(requests.length, count);
+  } finally { mock.server.close(); }
+});
+
 function runCli(args) {
   return new Promise((resolve) => {
     execFile(

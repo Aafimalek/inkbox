@@ -287,7 +287,7 @@ export type {
 export type { IncomingCallActionResource } from "./phone/resources/incomingCallAction.js";
 export type { HostedAgentConfigResource } from "./phone/resources/hostedAgent.js";
 export type {
-  McpAuth, McpContextSelections, HostedMcpCreate, HostedMcpUpdate,
+  McpAuth, McpOAuthAuth, HostedMcpAuthorization, McpContextSelections, HostedMcpCreate, HostedMcpUpdate,
   HostedMcpConnection, HostedMcpCatalog, HostedMcpTestResult, HostedMcpActivityPage,
 } from "./phone/hostedMcp.js";
 export type {

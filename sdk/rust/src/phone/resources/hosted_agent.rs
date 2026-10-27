@@ -15,6 +15,53 @@ pub struct HostedAgentConfigResource {
 }
 
 impl HostedAgentConfigResource {
+    /// Request a browser connection URL requiring human approval.
+    pub fn start_mcp_authorization(
+        &self,
+        id: Uuid,
+        expected_version: u32,
+        idempotency_key: &str,
+    ) -> Result<HostedMcpAuthorization> {
+        Ok(serde_json::from_value(self.http.post_with_headers(
+            &format!("/hosted-agent-config/mcp-servers/{id}/oauth/authorizations"),
+            Some(&serde_json::json!({"expected_version": expected_version})),
+            &[],
+            &[("Idempotency-Key", idempotency_key)],
+        )?)?)
+    }
+
+    pub fn get_mcp_authorization(
+        &self,
+        id: Uuid,
+        transaction_id: Uuid,
+    ) -> Result<HostedMcpAuthorization> {
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/hosted-agent-config/mcp-servers/{id}/oauth/authorizations/{transaction_id}"),
+            &[],
+        )?)?)
+    }
+
+    pub fn cancel_mcp_authorization(&self, id: Uuid, transaction_id: Uuid) -> Result<()> {
+        self.http.delete(&format!(
+            "/hosted-agent-config/mcp-servers/{id}/oauth/authorizations/{transaction_id}"
+        ))?;
+        Ok(())
+    }
+
+    pub fn disconnect_mcp_server(
+        &self,
+        id: Uuid,
+        expected_version: u32,
+        idempotency_key: &str,
+    ) -> Result<HostedMcpTestResult> {
+        Ok(serde_json::from_value(self.http.post_with_headers(
+            &format!("/hosted-agent-config/mcp-servers/{id}/oauth/disconnect"),
+            Some(&serde_json::json!({"expected_version": expected_version})),
+            &[],
+            &[("Idempotency-Key", idempotency_key)],
+        )?)?)
+    }
+
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }
     }
@@ -246,6 +293,66 @@ mod tests {
             "effective_model": "fast-model",
             "instructions": "Always offer to text a summary after the call."
         })
+    }
+
+    #[test]
+    fn oauth_operations_preserve_version_and_idempotency_headers() {
+        let server = MockServer::start();
+        let id = uuid::Uuid::parse_str("33333333-3333-4333-8333-333333333333").unwrap();
+        let base = format!("/api/v1/phone/hosted-agent-config/mcp-servers/{id}/oauth");
+        let authorization = json!({"id": id, "connection_id": id, "agent_identity_id": id,
+            "status": "pending", "expires_at": "2026-10-27T20:00:00Z", "requested_scopes": ["read"],
+            "connect_url": "https://inkbox.ai/console/mcp-connections/oauth/connect"});
+        let start = server.mock(|when, then| {
+            when.method(POST)
+                .path(format!("{base}/authorizations"))
+                .header("Idempotency-Key", "connect")
+                .json_body(json!({"expected_version": 2}));
+            then.status(201).json_body(authorization.clone());
+        });
+        let status = server.mock(|when, then| {
+            when.method(GET).path(format!("{base}/authorizations/{id}"));
+            then.status(200).json_body(authorization);
+        });
+        let cancel = server.mock(|when, then| {
+            when.method(DELETE)
+                .path(format!("{base}/authorizations/{id}"));
+            then.status(204);
+        });
+        let disconnect = server.mock(|when, then| {
+            when.method(POST)
+                .path(format!("{base}/disconnect"))
+                .header("Idempotency-Key", "disconnect")
+                .json_body(json!({"expected_version": 3}));
+            then.status(200)
+                .json_body(json!({"success": true, "code": "disconnected", "config_version": 3}));
+        });
+        let client = client(&server);
+        let resource = client.hosted_agent();
+        assert_eq!(
+            resource
+                .start_mcp_authorization(id, 2, "connect")
+                .unwrap()
+                .status,
+            "pending"
+        );
+        assert_eq!(
+            resource
+                .get_mcp_authorization(id, id)
+                .unwrap()
+                .requested_scopes,
+            ["read"]
+        );
+        resource.cancel_mcp_authorization(id, id).unwrap();
+        assert!(
+            resource
+                .disconnect_mcp_server(id, 3, "disconnect")
+                .unwrap()
+                .success
+        );
+        for mock in [start, status, cancel, disconnect] {
+            mock.assert_hits(1);
+        }
     }
 
     #[test]
