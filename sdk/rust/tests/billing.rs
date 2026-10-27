@@ -87,3 +87,27 @@ fn multiple_countries_share_one_purchase_request() {
     }
     purchase.assert_hits(2);
 }
+
+#[test]
+fn line_bundle_purchase_has_stable_request_identity() {
+    use inkbox::billing::BundleCode;
+    let server = MockServer::start();
+    let client = Inkbox::builder("synthetic")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let key = Uuid::new_v4();
+    let purchase = server.mock(|when, then| {
+        when.method(POST).path("/api/v1/billing/line-bundles")
+            .json_body(json!({"code":"voip_line_bundle", "quote":"accepted", "request_key":key}));
+        then.status(202).json_body(json!({"offers":[], "agreements":[], "voice_seconds_remaining":900,"messages_remaining":150}));
+    });
+    for _ in 0..2 {
+        let result = client
+            .billing()
+            .purchase_line_bundle(BundleCode::VoipLineBundle, "accepted", key)
+            .unwrap();
+        assert_eq!(result.messages_remaining, 150);
+    }
+    purchase.assert_hits(2);
+}

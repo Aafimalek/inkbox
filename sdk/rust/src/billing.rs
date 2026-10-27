@@ -71,6 +71,56 @@ pub struct CountryQuote {
     pub items: Vec<CountryQuoteLine>,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BundleCode {
+    VoipLineBundle,
+    PersonalImessageLineBundle,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BundleOffer {
+    pub code: BundleCode,
+    pub name: String,
+    pub line_kind: String,
+    pub monthly_amount: String,
+    pub voice_seconds: i64,
+    pub messages: i64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BundleAgreement {
+    pub id: Uuid,
+    pub code: BundleCode,
+    pub name: String,
+    pub line_kind: String,
+    pub monthly_amount: String,
+    pub status: String,
+    pub paid_through: Option<String>,
+    pub cancel_at_period_end: bool,
+    pub change_pending: bool,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LineBundlesResponse {
+    pub offers: Vec<BundleOffer>,
+    pub agreements: Vec<BundleAgreement>,
+    pub voice_seconds_remaining: i64,
+    pub messages_remaining: i64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BundleQuote {
+    pub code: BundleCode,
+    pub name: String,
+    pub quote: String,
+    pub expires_at: i64,
+    pub monthly_amount: String,
+    pub bundle_amount_cents: i64,
+    pub amount_due_cents: i64,
+    pub invoice_total_cents: i64,
+    pub currency: String,
+    pub voice_seconds: i64,
+    pub messages: i64,
+    pub period_end: String,
+}
+
 pub struct BillingResource {
     http: Arc<HttpTransport>,
 }
@@ -140,6 +190,46 @@ impl BillingResource {
     pub fn resume_country(&self, agreement_id: Uuid) -> Result<CallingCountriesResponse> {
         Ok(serde_json::from_value(self.http.post(
             &format!("/billing/calling-countries/{agreement_id}/resume"),
+            Some(&json!({})),
+            NO_QUERY,
+        )?)?)
+    }
+    pub fn line_bundles(&self) -> Result<LineBundlesResponse> {
+        Ok(serde_json::from_value(
+            self.http.get("/billing/line-bundles", NO_QUERY)?,
+        )?)
+    }
+    pub fn quote_line_bundle(&self, code: BundleCode) -> Result<BundleQuote> {
+        Ok(serde_json::from_value(self.http.post(
+            "/billing/line-bundles/quote",
+            Some(&json!({"code":code})),
+            NO_QUERY,
+        )?)?)
+    }
+    /// Reuse request_key after an uncertain result to avoid another purchase.
+    pub fn purchase_line_bundle(
+        &self,
+        code: BundleCode,
+        quote: &str,
+        request_key: Uuid,
+    ) -> Result<LineBundlesResponse> {
+        Ok(serde_json::from_value(self.http.post(
+            "/billing/line-bundles",
+            Some(&json!({"code":code,"quote":quote,"request_key":request_key})),
+            NO_QUERY,
+        )?)?)
+    }
+    /// Remove an unused slot; paid usage credits remain until expiry.
+    pub fn cancel_line_bundle(&self, agreement_id: Uuid) -> Result<LineBundlesResponse> {
+        Ok(serde_json::from_value(self.http.post(
+            &format!("/billing/line-bundles/{agreement_id}/cancel"),
+            Some(&json!({})),
+            NO_QUERY,
+        )?)?)
+    }
+    pub fn resume_line_bundle(&self, agreement_id: Uuid) -> Result<LineBundlesResponse> {
+        Ok(serde_json::from_value(self.http.post(
+            &format!("/billing/line-bundles/{agreement_id}/resume"),
             Some(&json!({})),
             NO_QUERY,
         )?)?)

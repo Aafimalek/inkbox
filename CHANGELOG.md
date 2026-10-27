@@ -4,6 +4,12 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.22
+
+### Added
+
+- Line bundle billing in Python, TypeScript, Rust and the CLI: preview prorated fees and organization-wide usage credits, purchase additional VoIP or personal dedicated iMessage capacity, and cancel or resume renewal. Canceling requires an unused line slot; paid credits remain until expiry.
+
 ## 0.7.21
 
 ### Added

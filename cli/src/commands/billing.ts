@@ -1,3 +1,4 @@
+import type { BundleCode } from "@inkbox/sdk";
 import { Command } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
@@ -39,4 +40,27 @@ export function registerBillingCommands(program: Command): void {
   countries.command("resume <agreement-id>").description("Resume at the existing price before coverage expires").action(withErrorHandler(async function (this: Command, id: string) {
     output(await createClient(getGlobalOpts(this)).billing.resumeCountry(id) as unknown as Record<string, unknown>, { json: true });
   }));
+  const bundles = billing.command("line-bundles").description("Additional line slots and shared usage credits");
+  bundles.command("list").action(withErrorHandler(async function (this: Command) {
+    output(await createClient(getGlobalOpts(this)).billing.lineBundles() as unknown as Record<string, unknown>, { json: true });
+  }));
+  bundles.command("quote <code>").description("Preview prorated charges and credits for a line bundle")
+    .action(withErrorHandler(async function (this: Command, code: BundleCode) {
+      output(await createClient(getGlobalOpts(this)).billing.quoteLineBundle(code) as unknown as Record<string, unknown>, { json: true });
+    }));
+  bundles.command("purchase <code>").description("Pay for voip_line_bundle or personal_imessage_line_bundle")
+    .requiredOption("--quote <quote>", "Signed quote from line-bundles quote")
+    .requiredOption("--request-key <uuid>", "Stable UUID for this purchase and every retry")
+    .requiredOption("--confirm", "Confirm the displayed invoice charge")
+    .action(withErrorHandler(async function (this: Command, code: BundleCode, options: { quote: string; requestKey: string }) {
+      output(await createClient(getGlobalOpts(this)).billing.purchaseLineBundle(code, options) as unknown as Record<string, unknown>, { json: true });
+    }));
+  bundles.command("cancel <agreement-id>").description("Remove an unused slot and stop renewal; keep paid usage credits")
+    .action(withErrorHandler(async function (this: Command, id: string) {
+      output(await createClient(getGlobalOpts(this)).billing.cancelLineBundle(id) as unknown as Record<string, unknown>, { json: true });
+    }));
+  bundles.command("resume <agreement-id>").description("Restore capacity and renewal without refilling credits")
+    .action(withErrorHandler(async function (this: Command, id: string) {
+      output(await createClient(getGlobalOpts(this)).billing.resumeLineBundle(id) as unknown as Record<string, unknown>, { json: true });
+    }));
 }

@@ -38,3 +38,20 @@ def test_multiple_destinations_share_one_purchase_and_retry_identity():
         resource.purchase_countries(countries, quote="accepted", request_key=key)
     assert http.post.call_args_list[0] == http.post.call_args_list[1]
     assert http.post.call_args.kwargs["json"] == {"country_codes": countries, "quote": "accepted", "request_key": str(key)}
+
+
+def test_line_bundle_purchase_retry_and_lifecycle_paths():
+    http = MagicMock()
+    resource = BillingResource(http)
+    resource.line_bundles()
+    http.get.assert_called_with("/billing/line-bundles")
+    resource.quote_line_bundle("personal_imessage_line_bundle")
+    http.post.assert_called_with("/billing/line-bundles/quote", json={"code":"personal_imessage_line_bundle"})
+    key = UUID("a3f22fcb-d805-4811-830c-2c61c3da5316")
+    for _ in range(2):
+        resource.purchase_line_bundle("voip_line_bundle", quote="accepted", request_key=key)
+    assert http.post.call_args_list[-1] == http.post.call_args_list[-2]
+    resource.cancel_line_bundle(key)
+    assert http.post.call_args.args == (f"/billing/line-bundles/{key}/cancel",)
+    resource.resume_line_bundle(key)
+    assert http.post.call_args.args == (f"/billing/line-bundles/{key}/resume",)

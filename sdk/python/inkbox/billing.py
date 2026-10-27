@@ -69,6 +69,52 @@ class CountryQuote(TypedDict):
     items: NotRequired[list[CountryQuoteLine]]
 
 
+BundleCode = Literal["voip_line_bundle", "personal_imessage_line_bundle"]
+
+
+class BundleOffer(TypedDict):
+    code: BundleCode
+    name: str
+    line_kind: Literal["voip", "imessage"]
+    monthly_amount: str
+    voice_seconds: int
+    messages: int
+
+
+class BundleAgreement(TypedDict):
+    id: str
+    code: BundleCode
+    name: str
+    line_kind: Literal["voip", "imessage"]
+    monthly_amount: str
+    status: str
+    paid_through: str | None
+    cancel_at_period_end: bool
+    change_pending: bool
+
+
+class LineBundlesResponse(TypedDict):
+    offers: list[BundleOffer]
+    agreements: list[BundleAgreement]
+    voice_seconds_remaining: int
+    messages_remaining: int
+
+
+class BundleQuote(TypedDict):
+    quote: str
+    expires_at: int
+    code: BundleCode
+    name: str
+    monthly_amount: str
+    bundle_amount_cents: int
+    amount_due_cents: int
+    invoice_total_cents: int
+    currency: str
+    voice_seconds: int
+    messages: int
+    period_end: str
+
+
 class BillingResource:
     """Requires an organization-admin API key; identity-scoped keys cannot purchase."""
 
@@ -106,3 +152,22 @@ class BillingResource:
 
     def resume_country(self, agreement_id: UUID | str) -> CallingCountriesResponse:
         return cast(CallingCountriesResponse, self._http.post(f"/billing/calling-countries/{UUID(str(agreement_id))}/resume", json={}))
+
+    def line_bundles(self) -> LineBundlesResponse:
+        return cast(LineBundlesResponse, self._http.get("/billing/line-bundles"))
+
+    def quote_line_bundle(self, code: BundleCode) -> BundleQuote:
+        return cast(BundleQuote, self._http.post("/billing/line-bundles/quote", json={"code": code}))
+
+    def purchase_line_bundle(self, code: BundleCode, *, quote: str, request_key: UUID | str) -> LineBundlesResponse:
+        """Add capacity and prorated credits; reuse request_key after an uncertain result."""
+        return cast(LineBundlesResponse, self._http.post("/billing/line-bundles", json={
+            "code": code, "quote": quote, "request_key": str(request_key),
+        }))
+
+    def cancel_line_bundle(self, agreement_id: UUID | str) -> LineBundlesResponse:
+        """Remove an unused slot and stop renewal; retain paid usage credits until expiry."""
+        return cast(LineBundlesResponse, self._http.post(f"/billing/line-bundles/{UUID(str(agreement_id))}/cancel", json={}))
+
+    def resume_line_bundle(self, agreement_id: UUID | str) -> LineBundlesResponse:
+        return cast(LineBundlesResponse, self._http.post(f"/billing/line-bundles/{UUID(str(agreement_id))}/resume", json={}))

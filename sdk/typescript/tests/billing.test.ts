@@ -34,3 +34,21 @@ it("quotes and purchases multiple countries in one request with a stable retry k
   expect(JSON.parse(String(requests[1][1].body))).toEqual({ country_codes: ["FR", "JP"], quote: options.quote, request_key: options.requestKey });
   expect(requests[1][1].body).toBe(requests[2][1].body);
 });
+
+it("preserves line bundle purchase identity and encodes agreement paths", async () => {
+  const fetch = vi.fn(async () => new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } }));
+  vi.stubGlobal("fetch", fetch);
+  const client = new Inkbox({ apiKey: "synthetic-test-key" });
+  await client.billing.quoteLineBundle("personal_imessage_line_bundle");
+  const options = { quote: "accepted", requestKey: "a3f22fcb-d805-4811-830c-2c61c3da5316" };
+  await client.billing.purchaseLineBundle("voip_line_bundle", options);
+  await client.billing.purchaseLineBundle("voip_line_bundle", options);
+  await client.billing.cancelLineBundle(options.requestKey);
+  await client.billing.resumeLineBundle(options.requestKey);
+  const requests = fetch.mock.calls as unknown as [string, RequestInit][];
+  expect(JSON.parse(String(requests[0][1].body))).toEqual({ code: "personal_imessage_line_bundle" });
+  expect(JSON.parse(String(requests[1][1].body))).toEqual({ code: "voip_line_bundle", quote: options.quote, request_key: options.requestKey });
+  expect(requests[1][1].body).toBe(requests[2][1].body);
+  expect(requests[3][0]).toContain(`/line-bundles/${options.requestKey}/cancel`);
+  expect(requests[4][0]).toContain(`/line-bundles/${options.requestKey}/resume`);
+});

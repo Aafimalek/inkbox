@@ -25,6 +25,23 @@ export interface CountryQuote {
   items?: CountryQuoteLine[];
 }
 
+export type BundleCode = "voip_line_bundle" | "personal_imessage_line_bundle";
+export interface BundleOffer {
+  code: BundleCode; name: string; line_kind: "voip" | "imessage"; monthly_amount: string; voice_seconds: number; messages: number;
+}
+export interface BundleAgreement {
+  id: string; code: BundleCode; name: string; line_kind: "voip" | "imessage"; monthly_amount: string;
+  status: string; paid_through: string | null; cancel_at_period_end: boolean; change_pending: boolean;
+}
+export interface LineBundlesResponse {
+  offers: BundleOffer[]; agreements: BundleAgreement[]; voice_seconds_remaining: number; messages_remaining: number;
+}
+export interface BundleQuote {
+  code: BundleCode; name: string; quote: string; expires_at: number; monthly_amount: string;
+  bundle_amount_cents: number; amount_due_cents: number; invoice_total_cents: number; currency: string;
+  voice_seconds: number; messages: number; period_end: string;
+}
+
 /** Organization-admin billing. Decimal amounts and response field names preserve the API representation. */
 export class BillingResource {
   constructor(private readonly http: HttpTransport) {}
@@ -49,5 +66,20 @@ export class BillingResource {
   }
   resumeCountry(agreementId: string): Promise<CallingCountriesResponse> {
     return this.http.post(`/billing/calling-countries/${encodeURIComponent(agreementId)}/resume`, {});
+  }
+  lineBundles(): Promise<LineBundlesResponse> { return this.http.get("/billing/line-bundles"); }
+  quoteLineBundle(code: BundleCode): Promise<BundleQuote> {
+    return this.http.post("/billing/line-bundles/quote", { code });
+  }
+  /** Add capacity and prorated credits; reuse requestKey after an uncertain response. */
+  purchaseLineBundle(code: BundleCode, options: { quote: string; requestKey: string }): Promise<LineBundlesResponse> {
+    return this.http.post("/billing/line-bundles", { code, quote: options.quote, request_key: options.requestKey });
+  }
+  /** Remove an unused slot, retaining paid usage credits until expiry. */
+  cancelLineBundle(agreementId: string): Promise<LineBundlesResponse> {
+    return this.http.post(`/billing/line-bundles/${encodeURIComponent(agreementId)}/cancel`, {});
+  }
+  resumeLineBundle(agreementId: string): Promise<LineBundlesResponse> {
+    return this.http.post(`/billing/line-bundles/${encodeURIComponent(agreementId)}/resume`, {});
   }
 }
