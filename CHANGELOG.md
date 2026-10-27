@@ -4,6 +4,25 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.21 - Voice AI external connections (unreleased)
+
+### Added
+
+- Manage up to three MCP connections per identity through Python, TypeScript, Rust,
+  and `inkbox phone hosted-agent mcp`. Create, inspect, update, delete, test, and
+  refresh connections; browse catalogs and read external call activity.
+- Configure bearer or custom-header authentication, tool allowlists, and selected
+  prompts, resources, and instruction-only Skills. CLI configuration reads from
+  a JSON file or stdin.
+- Voice catalogs expose `mcp_supported` (Python/Rust) or `mcpSupported`
+  (TypeScript) so clients can check compatibility.
+
+### Changed
+
+- **Source-breaking for manually constructed voice options:**
+  `HostedAgentVoiceOption` adds required `mcpSupported` in TypeScript and
+  `mcp_supported` in Rust struct literals. Parsed older responses default to false.
+
 ## 0.7.20 - iMessage line roles (unreleased)
 
 ### Added

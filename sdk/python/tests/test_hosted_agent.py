@@ -24,6 +24,24 @@ from sample_data_identities import IDENTITY_DETAIL_DICT
 IDENTITY_ID = "eeee5555-0000-0000-0000-000000000001"
 
 
+def test_mcp_patch_preserves_omission_and_explicit_grant_removal(client, transport):
+    response = {"id": IDENTITY_ID, "agent_identity_id": IDENTITY_ID, "label": "Calendar",
+                "url": "https://tools.example/mcp", "transport": "streamable_http", "auth": {"type": "bearer", "configured": True},
+                "enabled": True, "allowed_tools": None, "context": {}, "config_version": 2, "preparation_status": "pending"}
+    transport.patch.return_value = response
+    client._hosted_agent.update_mcp_server(IDENTITY_ID, {"expected_version": 1, "label": "Calendar"})
+    assert "auth" not in transport.patch.call_args.kwargs["json"]
+    assert "allowed_tools" not in transport.patch.call_args.kwargs["json"]
+    client._hosted_agent.update_mcp_server(IDENTITY_ID, {"expected_version": 2, "auth": {"type": "none"}, "allowed_tools": None})
+    assert transport.patch.call_args.kwargs["json"] == {"expected_version": 2, "auth": {"type": "none"}, "allowed_tools": None}
+    transport.post.return_value = response
+    created = client._hosted_agent.create_mcp_server({"label": "Calendar", "url": "https://tools.example/mcp",
+        "auth": {"type": "header", "header_name": "X-Example-Key", "value_prefix": "Token ", "token": "synthetic"}}, idempotency_key="stable-create")
+    assert transport.post.call_args.kwargs["headers"] == {"Idempotency-Key": "stable-create"}
+    assert transport.post.call_args.kwargs["json"]["auth"]["token"] == "synthetic"
+    assert "synthetic" not in repr(created)
+
+
 class TestHostedAgentGetConfig:
     def test_get_no_identity(self, client, transport):
         transport.get.return_value = HOSTED_AGENT_CONFIG_DICT

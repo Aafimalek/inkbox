@@ -486,6 +486,7 @@ export interface HostedAgentVoiceOption {
   description: string;
   available: boolean;
   previewUrl: string | null;
+  mcpSupported: boolean;
 }
 
 /** Organization-scoped Voice AI choices, including unavailable voices. */
@@ -837,6 +838,7 @@ export interface RawHostedAgentVoiceCatalog {
     description: string;
     available: boolean;
     preview_url?: string | null;
+    mcp_supported?: boolean;
   }[];
   default_voice: string;
 }
@@ -1076,6 +1078,7 @@ export function parseHostedAgentVoiceCatalog(
       description: voice.description,
       available: voice.available,
       previewUrl: voice.preview_url ?? null,
+      mcpSupported: voice.mcp_supported ?? false,
     })),
     defaultVoice: r.default_voice,
   };

@@ -6,7 +6,9 @@ use serde_json::Map;
 
 use crate::error::Result;
 use crate::http::HttpTransport;
+use crate::phone::hosted_mcp::*;
 use crate::phone::types::{HostedAgentAuthorityMode, HostedAgentConfig, HostedAgentVoiceCatalog};
+use uuid::Uuid;
 
 pub struct HostedAgentConfigResource {
     http: Arc<HttpTransport>,
@@ -15,6 +17,109 @@ pub struct HostedAgentConfigResource {
 impl HostedAgentConfigResource {
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }
+    }
+
+    pub fn list_mcp_servers(
+        &self,
+        agent_identity_id: Option<Uuid>,
+    ) -> Result<Vec<HostedMcpConnection>> {
+        let params = agent_identity_id
+            .map(|id| vec![("agent_identity_id", id.to_string())])
+            .unwrap_or_default();
+        let data = self.http.get("/hosted-agent-config/mcp-servers", &params)?;
+        Ok(serde_json::from_value(data["connections"].clone())?)
+    }
+
+    pub fn create_mcp_server(
+        &self,
+        body: &HostedMcpCreate,
+        idempotency_key: &str,
+    ) -> Result<HostedMcpConnection> {
+        let data = self.http.post_with_headers(
+            "/hosted-agent-config/mcp-servers",
+            Some(body),
+            &[],
+            &[("Idempotency-Key", idempotency_key)],
+        )?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    pub fn get_mcp_server(&self, id: Uuid) -> Result<HostedMcpConnection> {
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/hosted-agent-config/mcp-servers/{id}"),
+            &[],
+        )?)?)
+    }
+
+    /// URL changes require replacement authentication or explicit `McpAuth::None`.
+    pub fn update_mcp_server(
+        &self,
+        id: Uuid,
+        body: &HostedMcpUpdate,
+    ) -> Result<HostedMcpConnection> {
+        Ok(serde_json::from_value(self.http.patch(
+            &format!("/hosted-agent-config/mcp-servers/{id}"),
+            body,
+        )?)?)
+    }
+
+    pub fn delete_mcp_server(&self, id: Uuid) -> Result<()> {
+        self.http
+            .delete(&format!("/hosted-agent-config/mcp-servers/{id}"))?;
+        Ok(())
+    }
+
+    pub fn test_mcp_server(&self, id: Uuid) -> Result<HostedMcpTestResult> {
+        Ok(serde_json::from_value(self.http.post::<()>(
+            &format!("/hosted-agent-config/mcp-servers/{id}/test"),
+            None,
+            &[],
+        )?)?)
+    }
+
+    pub fn refresh_mcp_server(
+        &self,
+        id: Uuid,
+        idempotency_key: &str,
+    ) -> Result<HostedMcpTestResult> {
+        Ok(serde_json::from_value(self.http.post_with_headers::<()>(
+            &format!("/hosted-agent-config/mcp-servers/{id}/refresh"),
+            None,
+            &[],
+            &[("Idempotency-Key", idempotency_key)],
+        )?)?)
+    }
+
+    pub fn get_mcp_catalog(
+        &self,
+        id: Uuid,
+        cursor: Option<&str>,
+        limit: u32,
+        skill_uri: Option<&str>,
+    ) -> Result<HostedMcpCatalog> {
+        let mut params = vec![("limit", limit.to_string())];
+        if let Some(cursor) = cursor {
+            params.push(("cursor", cursor.to_string()));
+        }
+        if let Some(uri) = skill_uri {
+            params.push(("skill_uri", uri.to_string()));
+        }
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/hosted-agent-config/mcp-servers/{id}/catalog"),
+            &params,
+        )?)?)
+    }
+
+    pub fn get_mcp_activity(
+        &self,
+        call_id: Uuid,
+        limit: u32,
+        offset: u32,
+    ) -> Result<HostedMcpActivityPage> {
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/calls/{call_id}/mcp-activity"),
+            &[("limit", limit.to_string()), ("offset", offset.to_string())],
+        )?)?)
     }
 
     /// List the organization's voice catalog, including unavailable voices.

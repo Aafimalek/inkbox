@@ -21,13 +21,38 @@ function mockHttp() {
 
 const IDENTITY_ID = "eeee5555-0000-0000-0000-000000000001";
 
+describe("MCP connection grants", () => {
+  it("distinguishes omitted authentication and restrictions from explicit removal", async () => {
+    const http = mockHttp();
+    const resource = new HostedAgentConfigResource(http);
+    const row = { id: IDENTITY_ID, agent_identity_id: IDENTITY_ID, label: "Calendar", url: "https://tools.example/mcp",
+      transport: "streamable_http", auth: { type: "bearer", configured: true }, enabled: true,
+      allowed_tools: null, context: {}, config_version: 2, preparation_status: "pending" };
+    vi.mocked(http.patch).mockResolvedValue(row);
+    await resource.updateMcpServer(IDENTITY_ID, { expectedVersion: 1, label: "Calendar" });
+    const wire = JSON.parse(JSON.stringify(vi.mocked(http.patch).mock.calls[0][1]));
+    expect(wire).toEqual({ expected_version: 1, label: "Calendar" });
+    await resource.updateMcpServer(IDENTITY_ID, { expectedVersion: 2, auth: { type: "none" }, allowedTools: null });
+    expect(JSON.parse(JSON.stringify(vi.mocked(http.patch).mock.calls[1][1]))).toEqual({ expected_version: 2, auth: { type: "none" }, allowed_tools: null });
+    vi.mocked(http.post).mockResolvedValue(row);
+    await resource.createMcpServer({ label: "Calendar", url: row.url,
+      auth: { type: "header", headerName: "X-Example-Key", valuePrefix: "Token ", token: "synthetic" },
+      context: { skills: [{ uri: "skill://guide/SKILL.md", manifestDigest: "a".repeat(64) }] },
+    }, { idempotencyKey: "stable-create" });
+    expect(http.post).toHaveBeenCalledWith("/hosted-agent-config/mcp-servers", expect.objectContaining({
+      auth: { type: "header", header_name: "X-Example-Key", value_prefix: "Token ", token: "synthetic" },
+      context: expect.objectContaining({ skills: [{ uri: "skill://guide/SKILL.md", manifest_digest: "a".repeat(64) }] }),
+    }), { headers: { "Idempotency-Key": "stable-create" } });
+  });
+});
+
 describe("HostedAgentConfigResource.listVoices", () => {
   it("fetches the organization catalog and preserves all voices and preview states", async () => {
     const http = mockHttp();
     const voice = { id: "future-voice", name: "Future Voice", description: "Warm", available: true };
     vi.mocked(http.get).mockResolvedValue({
       voices: [
-        { ...voice, preview_url: "https://example.com/voice.wav" },
+        { ...voice, preview_url: "https://example.com/voice.wav", mcp_supported: true },
         { ...voice, id: "unavailable-voice", available: false, preview_url: null },
         { ...voice, id: "no-preview" },
       ],
@@ -39,10 +64,10 @@ describe("HostedAgentConfigResource.listVoices", () => {
 
     expect(http.get).toHaveBeenCalledExactlyOnceWith("/hosted-agent-voices");
     expect(catalog.defaultVoice).toBe("future-default");
-    expect(first).toEqual({ ...voice, previewUrl: "https://example.com/voice.wav" });
+    expect(first).toEqual({ ...voice, previewUrl: "https://example.com/voice.wav", mcpSupported: true });
     expect(catalog.voices.slice(1)).toEqual([
-      { ...voice, id: "unavailable-voice", available: false, previewUrl: null },
-      { ...voice, id: "no-preview", previewUrl: null },
+      { ...voice, id: "unavailable-voice", available: false, previewUrl: null, mcpSupported: false },
+      { ...voice, id: "no-preview", previewUrl: null, mcpSupported: false },
     ]);
   });
 

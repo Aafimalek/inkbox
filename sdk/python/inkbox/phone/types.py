@@ -751,6 +751,7 @@ class HostedAgentVoiceOption:
     description: str
     available: bool
     preview_url: str | None = None
+    mcp_supported: bool = False
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> HostedAgentVoiceOption:
@@ -760,6 +761,7 @@ class HostedAgentVoiceOption:
             description=d["description"],
             available=d["available"],
             preview_url=d.get("preview_url"),
+            mcp_supported=d.get("mcp_supported", False),
         )
 
 

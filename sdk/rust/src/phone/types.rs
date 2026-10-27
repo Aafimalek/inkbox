@@ -695,6 +695,8 @@ pub struct HostedAgentVoiceOption {
     pub available: bool,
     #[serde(default)]
     pub preview_url: Option<String>,
+    #[serde(default)]
+    pub mcp_supported: bool,
 }
 
 /// Inkbox Voice AI voices and the server-selected default for the organization.
