@@ -1,6 +1,6 @@
 //! Slack workspace setup, live reads, and durable sends.
 //! Slack enums reject unrecognized values; a newer SDK may be required.
-//! Action/operation `Unknown` means terminal uncertainty, not a catch-all.
+//! Outcome `Unknown` means uncertainty, not a catch-all.
 use crate::error::{InkboxError, Result};
 use crate::http::{HttpTransport, NO_QUERY};
 use serde::{Deserialize, Serialize};
@@ -45,7 +45,31 @@ pub struct SlackConnectionsResponse {
     #[serde(default)]
     pub application_created: bool,
     #[serde(default)]
+    pub application_generation: Option<u64>,
+    #[serde(default)]
     pub provisioning_workspace: Option<SlackProvisioningWorkspace>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SlackAppDeletionStatus {
+    NotRequested,
+    Pending,
+    Deleted,
+    AlreadyDeleted,
+    Failed,
+    Unknown,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackApplicationReplacement {
+    pub operation_id: Uuid,
+    pub setup: SlackSetupStatus,
+    pub deletion_status: SlackAppDeletionStatus,
+    #[serde(default)]
+    pub deletion_error_code: Option<String>,
+}
+#[derive(Debug, Clone, Default)]
+pub struct SlackReplaceApplicationOptions {
+    pub delete_old_app: bool,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -242,6 +266,34 @@ impl SlackResource {
         Ok(serde_json::from_value(self.http.post(
             "/slack/applications/setup",
             Some(&json!({"identity_id": identity_id, "provisioning_workspace_id": provisioning_workspace_id})),
+            NO_QUERY,
+        )?)?)
+    }
+    /// Replace an app with organization management credentials, then authorize the new app.
+    /// Reuse request_id and arguments after an uncertain outcome. Previous connection
+    /// history is no longer accessible. Remote app deletion defaults to false.
+    pub fn replace_application(
+        &self,
+        identity_id: Uuid,
+        expected_application_generation: u64,
+        request_id: Uuid,
+        options: &SlackReplaceApplicationOptions,
+    ) -> Result<SlackApplicationReplacement> {
+        Ok(serde_json::from_value(self.http.post(
+            "/slack/applications/replace",
+            Some(&json!({
+                "identity_id": identity_id,
+                "expected_application_generation": expected_application_generation,
+                "request_id": request_id,
+                "delete_old_app": options.delete_old_app,
+            })),
+            NO_QUERY,
+        )?)?)
+    }
+    /// Read replacement progress with organization management credentials.
+    pub fn get_replacement(&self, operation_id: Uuid) -> Result<SlackApplicationReplacement> {
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/slack/applications/replacements/{operation_id}"),
             NO_QUERY,
         )?)?)
     }

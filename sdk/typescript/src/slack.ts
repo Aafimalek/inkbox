@@ -22,6 +22,7 @@ export interface SlackConnectionsResponse {
   setup?: SlackSetupStatus | null;
   /** App existence, independent of identity enablement or workspace connections. */
   applicationCreated?: boolean;
+  applicationGeneration?: number | null;
   provisioningWorkspace?: SlackProvisioningWorkspace | null;
 }
 export interface SlackSetupStatus {
@@ -29,6 +30,19 @@ export interface SlackSetupStatus {
   retryAt: Date | null;
   errorCode: "setup_failed" | "outcome_unknown" | "quota_exceeded" | "credentials_required" | null;
   provisioningWorkspaceId: string | null;
+}
+export type SlackAppDeletionStatus =
+  "not_requested" | "pending" | "deleted" | "already_deleted" | "failed" | "unknown";
+export interface SlackApplicationReplacement {
+  operationId: string;
+  setup: SlackSetupStatus;
+  deletionStatus: SlackAppDeletionStatus;
+  deletionErrorCode: string | null;
+}
+export interface SlackReplaceApplicationOptions {
+  expectedApplicationGeneration: number;
+  requestId: string;
+  deleteOldApp?: boolean;
 }
 export interface SlackProvisioningWorkspace {
   id: string;
@@ -107,6 +121,18 @@ const setupStatus = (r: RawSetupStatus): SlackSetupStatus => ({
   retryAt: r.retry_at ? new Date(r.retry_at) : null,
   errorCode: r.error_code ?? null,
   provisioningWorkspaceId: r.provisioning_workspace_id ?? null,
+});
+interface RawApplicationReplacement {
+  operation_id: string;
+  setup: RawSetupStatus;
+  deletion_status: SlackAppDeletionStatus;
+  deletion_error_code?: string | null;
+}
+const applicationReplacement = (r: RawApplicationReplacement): SlackApplicationReplacement => ({
+  operationId: r.operation_id,
+  setup: setupStatus(r.setup),
+  deletionStatus: r.deletion_status,
+  deletionErrorCode: r.deletion_error_code ?? null,
 });
 interface RawProvisioningWorkspace {
   id: string;
@@ -216,6 +242,7 @@ export class SlackResource extends SlackOperationsResource {
       installation_available: boolean;
       setup?: RawSetupStatus | null;
       application_created?: boolean;
+      application_generation?: number | null;
       provisioning_workspace?: RawProvisioningWorkspace | null;
     }>("/slack/connections", { identity_id: identityId });
     return {
@@ -223,6 +250,7 @@ export class SlackResource extends SlackOperationsResource {
       installationAvailable: r.installation_available,
       setup: r.setup ? setupStatus(r.setup) : null,
       applicationCreated: r.application_created ?? false,
+      applicationGeneration: r.application_generation ?? null,
       provisioningWorkspace: r.provisioning_workspace ? provisioningWorkspace(r.provisioning_workspace) : null,
     };
   }
@@ -252,6 +280,28 @@ export class SlackResource extends SlackOperationsResource {
         identity_id: identityId,
         provisioning_workspace_id: provisioningWorkspaceId,
       },
+    ));
+  }
+  /** Replace an app with organization management credentials, then authorize the new app.
+   * Reuse requestId and arguments after an uncertain outcome. Previous connection history
+   * is no longer accessible. Remote app deletion defaults to false. */
+  async replaceApplication(
+    identityId: string,
+    options: SlackReplaceApplicationOptions,
+  ): Promise<SlackApplicationReplacement> {
+    return applicationReplacement(await this.http.post<RawApplicationReplacement>(
+      "/slack/applications/replace", {
+        identity_id: identityId,
+        expected_application_generation: options.expectedApplicationGeneration,
+        request_id: options.requestId,
+        delete_old_app: options.deleteOldApp ?? false,
+      },
+    ));
+  }
+  /** Read replacement progress with organization management credentials. */
+  async getReplacement(operationId: string): Promise<SlackApplicationReplacement> {
+    return applicationReplacement(await this.http.get<RawApplicationReplacement>(
+      `/slack/applications/replacements/${encodeURIComponent(operationId)}`,
     ));
   }
   /** Removes Inkbox authority; does not uninstall the Slack app. */

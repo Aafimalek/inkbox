@@ -1103,6 +1103,7 @@ lookup; the UUID form avoids that lookup.
 | Command group | Operations |
 | --- | --- |
 | `slack setup` | `start` (preparation status is returned by `connection list`) |
+| `slack application` | `replace`, `replacement --operation-id <uuid>` |
 | `slack search` | Search retained messages across an identity's workspace connections |
 | `slack contact-rule` | `list`, `list-all`, `get`, `create`, `update`, `delete` |
 | `slack contacts-import` | Import one page of directory or selected conversation members into contact cards; organization admin API key required |
@@ -1112,6 +1113,28 @@ lookup; the UUID form avoids that lookup.
 | `slack message` | `list`, `send` |
 | `slack action` | `get <action-id>`, `get-by-key --idempotency-key <key>` |
 | `slack file` | `get <file-id>`, `download <file-id>`, `preview <file-id>` |
+
+To create a new app for an existing identity, use an organization admin API key:
+
+```bash
+inkbox slack connection list --identity example-agent
+# Use the returned applicationGeneration (not a connection generation).
+inkbox slack application replace --identity example-agent \
+  --expected-application-generation 1 \
+  --request-id 33333333-3333-4333-8333-333333333333
+inkbox slack application replacement \
+  --operation-id 33333333-3333-4333-8333-333333333333
+```
+
+Save the request ID and generation before replacing. Retry with the same ID and
+identical arguments after an uncertain request outcome. Add `--delete-old-app`
+only to permanently delete the previous app from Slack; it defaults to off.
+The deletion outcome is separate from new-app preparation. Confirmed already
+absent is successful; credential errors and timeouts are not proof of deletion.
+When setup is ready, use `installation start`, authorize the new bot, and invite it
+to channels again. Previous connection history is no longer accessible through
+Inkbox. The Inkbox identity, other channels, and runtime memory are unchanged.
+Claimed agent keys cannot replace apps or read replacement progress.
 
 All conversation/message/action/file operations require `--connection-id`.
 Use `--conversation-id` for an existing conversation, `--thread-ts` for a thread,

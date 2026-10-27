@@ -4,6 +4,27 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.23 - Slack app replacement (unreleased)
+
+### Added
+
+- Replace a Slack app for an existing identity with Python `replace_application`,
+  TypeScript `replaceApplication`, Rust `replace_application`, and CLI
+  `slack application replace`. Read progress with `get_replacement`,
+  `getReplacement`, or `slack application replacement`.
+- Read `application_generation` / `applicationGeneration` from connection lists
+  and provide it with a request UUID to protect replacement retries.
+- Optional permanent deletion of the previous app, disabled by default, with
+  deletion outcomes reported independently of new-app preparation.
+
+### Changed
+
+- Replacement requires organization management credentials, fresh app
+  authorization, and channel invitations. Previous connection history is no
+  longer accessible; the Inkbox identity and other channels are unchanged.
+- **Source-breaking for Rust struct literals:** add `application_generation: None`
+  to `SlackConnectionsResponse`. Deserializing older responses remains supported.
+
 ## 0.7.22
 
 ### Added

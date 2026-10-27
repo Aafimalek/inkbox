@@ -44,6 +44,17 @@ class SlackConnectionsResponse:
     setup: SlackSetupStatus | None = None
     application_created: bool = False
     provisioning_workspace: SlackProvisioningWorkspace | None = None
+    application_generation: int | None = None
+
+
+@dataclass
+class SlackApplicationReplacement:
+    """Replacement progress and the independent old-app deletion outcome."""
+
+    operation_id: UUID
+    setup: SlackSetupStatus
+    deletion_status: Literal["not_requested", "pending", "deleted", "already_deleted", "failed", "unknown"]
+    deletion_error_code: str | None = None
 
 
 @dataclass
@@ -111,7 +122,7 @@ class SlackContactImportResponse:
 
 def _parse(cls, raw):
     data = {k: v for k, v in raw.items() if k in cls.__dataclass_fields__}
-    for key in ("id", "identity_id", "connection_id", "provisioning_workspace_id"):
+    for key in ("id", "identity_id", "connection_id", "provisioning_workspace_id", "operation_id"):
         if data.get(key) is not None and cls is not SlackFile:
             data[key] = UUID(data[key])
     for key in ("created_at", "updated_at", "expires_at", "token_expires_at"):
@@ -119,6 +130,8 @@ def _parse(cls, raw):
             data[key] = datetime.fromisoformat(data[key])
     if data.get("retry_at") is not None:
         data["retry_at"] = datetime.fromisoformat(data["retry_at"])
+    if cls is SlackApplicationReplacement:
+        data["setup"] = _parse(SlackSetupStatus, data["setup"])
     return cls(**data)
 
 
@@ -156,6 +169,7 @@ class SlackResource(SlackOperationsMixin):
             data["installation_available"],
             _parse(SlackSetupStatus, data["setup"]) if data.get("setup") is not None else None,
             application_created=data.get("application_created", False),
+            application_generation=data.get("application_generation"),
             provisioning_workspace=_parse(SlackProvisioningWorkspace, data["provisioning_workspace"])
             if data.get("provisioning_workspace") is not None else None,
         )
@@ -184,6 +198,36 @@ class SlackResource(SlackOperationsMixin):
                 "identity_id": str(identity_id),
                 "provisioning_workspace_id": str(provisioning_workspace_id),
             }
+        ))
+
+    def replace_application(
+        self,
+        identity_id: UUID | str,
+        *,
+        expected_application_generation: int,
+        request_id: UUID | str,
+        delete_old_app: bool = False,
+    ) -> SlackApplicationReplacement:
+        """Replace an app using organization management credentials.
+
+        Read the current generation with ``list_connections``. Reuse the same
+        request ID and arguments after an uncertain request outcome. The new
+        app needs authorization; old connection history is no longer accessible.
+        Remote app deletion is optional and defaults to false.
+        """
+        return _parse(SlackApplicationReplacement, self._http.post(
+            "/slack/applications/replace", json={
+                "identity_id": str(identity_id),
+                "expected_application_generation": expected_application_generation,
+                "request_id": str(request_id),
+                "delete_old_app": delete_old_app,
+            },
+        ))
+
+    def get_replacement(self, operation_id: UUID | str) -> SlackApplicationReplacement:
+        """Read replacement progress using organization management credentials."""
+        return _parse(SlackApplicationReplacement, self._http.get(
+            f"/slack/applications/replacements/{quote(str(operation_id), safe='')}",
         ))
 
     def start_installation(

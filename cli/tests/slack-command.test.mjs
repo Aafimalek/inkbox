@@ -79,6 +79,28 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
       "GET",
       `/api/v1/slack/connections?identity_id=${i}`,
     );
+    const operationId = "33333333-3333-4333-8333-333333333333";
+    const replacement = { operation_id: operationId, setup: { status: "pending" },
+      deletion_status: "not_requested", deletion_error_code: null };
+    const replaced = await check(
+      ["slack", "application", "replace", "--identity-id", i,
+        "--expected-application-generation", "2", "--request-id", operationId],
+      replacement, "POST", "/api/v1/slack/applications/replace",
+      { identity_id: i, expected_application_generation: 2, request_id: operationId, delete_old_app: false },
+    );
+    assert.equal(replaced.operationId, operationId);
+    assert.equal(replaced.deletionStatus, "not_requested");
+    await check(
+      ["slack", "application", "replace", "--identity-id", i,
+        "--expected-application-generation", "2", "--request-id", operationId, "--delete-old-app"],
+      { ...replacement, deletion_status: "pending" }, "POST", "/api/v1/slack/applications/replace",
+      { identity_id: i, expected_application_generation: 2, request_id: operationId, delete_old_app: true },
+    );
+    await check(
+      ["slack", "application", "replacement", "--operation-id", operationId],
+      { ...replacement, deletion_status: "already_deleted" }, "GET",
+      `/api/v1/slack/applications/replacements/${operationId}`,
+    );
     const credentialsFile = path.join(tmp, "credentials.json");
     await writeFile(credentialsFile, JSON.stringify({ access_token: "synthetic-access", refresh_token: "synthetic-refresh" }), { mode: 0o600 });
     const workspace = await check(
@@ -256,7 +278,7 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
       `/api/v1/webhooks/subscriptions/${f.subscription.id}`,
       { url: "https://example.com/new" },
     );
-    assert.equal(requests.length, 26);
+    assert.equal(requests.length, 29);
     const rejected = await run([
       ...globals,
       "slack",
@@ -271,7 +293,7 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
     ]);
     assert.ok(rejected.error);
     assert.match(rejected.stderr, /idempotency-key/);
-    assert.equal(requests.length, 26);
+    assert.equal(requests.length, 29);
     const missingRecipient = await run([
       ...globals,
       "slack",
@@ -282,7 +304,7 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
     ]);
     assert.ok(missingRecipient.error);
     assert.match(missingRecipient.stderr, /required option.*--user-id/);
-    assert.equal(requests.length, 26);
+    assert.equal(requests.length, 29);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await rm(tmp, { recursive: true, force: true });
@@ -334,6 +356,16 @@ test("identity-scoped Slack commands resolve handles and reject ambiguous select
     "slack",
   ];
   const cases = [
+    {
+      args: ["application", "replace", "--expected-application-generation", "2",
+        "--request-id", "33333333-3333-4333-8333-333333333333"],
+      response: { operation_id: "33333333-3333-4333-8333-333333333333",
+        setup: { status: "pending" }, deletion_status: "not_requested", deletion_error_code: null },
+      method: "POST",
+      url: "/api/v1/slack/applications/replace",
+      body: { identity_id: identityId, expected_application_generation: 2,
+        request_id: "33333333-3333-4333-8333-333333333333", delete_old_app: false },
+    },
     {
       args: ["setup", "start", "--provisioning-workspace-id", f.provisioning_workspace.id],
       response: { status: "ready", retry_at: null, error_code: null },
@@ -508,4 +540,16 @@ test("Slack CLI exposes retry delay and recovers by key without sending again", 
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   }
+});
+
+test("Slack replacement requires explicit request identity and a positive app generation", async () => {
+  const args = ["--api-key", "synthetic-test-key", "slack", "application", "replace",
+    "--identity-id", "11111111-1111-4111-8111-111111111111"];
+  const missingRequest = await run([...args, "--expected-application-generation", "1"]);
+  assert.ok(missingRequest.error);
+  assert.match(missingRequest.stderr, /request-id/);
+  const invalidGeneration = await run([...args, "--expected-application-generation", "0",
+    "--request-id", "33333333-3333-4333-8333-333333333333"]);
+  assert.ok(invalidGeneration.error);
+  assert.match(invalidGeneration.stderr, /positive integer/);
 });

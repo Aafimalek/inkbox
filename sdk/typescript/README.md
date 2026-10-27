@@ -1968,6 +1968,17 @@ private contact sessions. Unknown notice codes/levels remain available to caller
 
 ## Slack
 
+With organization management credentials, use `client.slack.replaceApplication`
+to create a new app for the same identity. Supply `expectedApplicationGeneration`
+from `listConnections` and a `requestId` UUID; reuse both with identical arguments
+when retrying an uncertain request. `deleteOldApp` defaults to `false`; set it to
+`true` only to permanently delete the previous app from Slack.
+Read progress with `getReplacement`. New-app setup and optional old-app deletion
+have separate outcomes. Authorize the new app and invite its bot to channels
+again. Previous connection history is no longer accessible through Inkbox;
+the identity and other channels are unchanged. Claimed agent keys cannot replace
+apps or read replacement progress.
+
 Slack contact rules support exact people and home workspaces, with whitelist or
 blacklist defaults and optional per-direction settings. Import visible people
 into real contact cards and use Slack with Companion mode. Importing a contact does not allow communication.

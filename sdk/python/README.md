@@ -1923,6 +1923,17 @@ inkbox.mailboxes.update("alex@example.com", signature_enabled=False)
 
 ## Slack
 
+With organization management credentials, use `client.slack.replace_application`
+to create a new app for the same identity. Supply `expected_application_generation`
+from `list_connections` and a `request_id` UUID; reuse both with identical arguments
+when retrying an uncertain request. `delete_old_app=False` keeps the previous app
+in Slack; set it to `True` only to permanently delete that app.
+Read progress with `get_replacement`. New-app setup and optional old-app deletion
+have separate outcomes. Authorize the new app and invite its bot to channels
+again. Previous connection history is no longer accessible through Inkbox;
+the identity and other channels are unchanged. Claimed agent keys cannot replace
+apps or read replacement progress.
+
 Slack contact rules support exact people and home workspaces, with whitelist or
 blacklist defaults and optional per-direction settings. Import visible people
 into real contact cards and use Slack with Companion mode. Importing a contact does not allow communication.

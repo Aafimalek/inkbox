@@ -115,6 +115,28 @@ export function registerSlackCommands(program: Command): void {
         });
       }),
     );
+  const applications = slack.command("application")
+    .description("Replace a Slack app with organization management credentials");
+  identity(applications.command("replace"))
+    .description("Replace the app; authorize the new bot and invite it to channels again")
+    .requiredOption("--expected-application-generation <n>", "Current application generation from connection list", slackInteger)
+    .requiredOption("--request-id <uuid>", "Request UUID; reuse with identical arguments when retrying")
+    .option("--delete-old-app", "Also permanently delete the old app from Slack", false)
+    .action(withErrorHandler(async function (
+      this: Command,
+      o: IdentityOptions & { expectedApplicationGeneration: number; requestId: string; deleteOldApp: boolean },
+    ) {
+      const opts = getGlobalOpts(this);
+      const client = createClient(opts);
+      output(await client.slack.replaceApplication(await resolveIdentityId(client, o), o), { json: !!opts.json });
+    }));
+  applications.command("replacement")
+    .description("Read replacement and optional deletion progress")
+    .requiredOption("--operation-id <uuid>", "Operation UUID returned by application replace")
+    .action(withErrorHandler(async function (this: Command, o: { operationId: string }) {
+      const opts = getGlobalOpts(this);
+      output(await createClient(opts).slack.getReplacement(o.operationId), { json: !!opts.json });
+    }));
   page(identity(slack.command("search")))
     .description(
       "Search retained messages across an identity's workspaces; agent credentials infer identity",
