@@ -32,6 +32,7 @@ from inkbox.contacts.resources.contacts import ContactsResource
 from inkbox.companion import CompanionResource
 from inkbox.message_sends import MessageSendsResource
 from inkbox.notes.resources.notes import NotesResource
+from inkbox.billing import BillingResource
 from inkbox.agent_signup.types import (
     AgentSignupResponse,
     AgentSignupVerifyResponse,
@@ -321,6 +322,7 @@ class Inkbox:
         self.companion = CompanionResource(self._api_http)
         self.message_sends = MessageSendsResource(self._api_http, self._mailboxes)
         self._notes = NotesResource(self._contacts_http)
+        self.billing = BillingResource(self._contacts_http)
 
         self._tunnels = TunnelsResource(self._api_http, inkbox=self)
 

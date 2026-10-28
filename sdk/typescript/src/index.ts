@@ -545,3 +545,6 @@ export type {
   SlackCachedReaction,
   SlackCachedEmojiOptions,
 } from "./slack-cache.js";
+
+export { BillingResource } from "./billing.js";
+export type { CatalogRate, PricingResponse, CountryAgreement, CallingCountry, CallingCountriesResponse, CountryQuote, BundleCode, BundleOffer, BundleAgreement, LineBundlesResponse, BundleQuote } from "./billing.js";

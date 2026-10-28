@@ -20,6 +20,7 @@ use crate::agent_signup::types::{
     AgentSignupVerifyResponse,
 };
 use crate::api_keys::resources::api_keys::ApiKeysResource;
+use crate::billing::BillingResource;
 use crate::companion::CompanionResource;
 use crate::contacts::resources::contacts::ContactsResource;
 use crate::cookies::CookieJar;
@@ -177,6 +178,7 @@ pub struct Inkbox {
     contacts: ContactsResource,
     companion: CompanionResource,
     notes: NotesResource,
+    billing: BillingResource,
 
     // Org-level
     signing_keys: SigningKeysResource,
@@ -318,6 +320,7 @@ impl Inkbox {
                 mk(&format!("{api_root}/mail")),
             ),
             notes: NotesResource::new(contacts_http.clone()),
+            billing: BillingResource::new(contacts_http.clone()),
 
             signing_keys: SigningKeysResource::new(api_http.clone()),
             webhook_subscriptions: WebhookSubscriptionsResource::new(api_http.clone()),
@@ -470,6 +473,10 @@ impl Inkbox {
     pub fn contacts(&self) -> &ContactsResource {
         &self.contacts
     }
+    pub fn billing(&self) -> &BillingResource {
+        &self.billing
+    }
+
     pub fn notes(&self) -> &NotesResource {
         &self.notes
     }
