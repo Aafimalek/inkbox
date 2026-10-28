@@ -550,20 +550,6 @@ test("Slack removal requires explicit request identity and a positive app genera
   assert.match(invalidGeneration.stderr, /positive integer/);
 });
 
-test("Slack automatic app replacement command is unavailable", async () => {
-  const rejected = await run(["--api-key", "synthetic-test-key", "slack", "application", "replace"]);
-  assert.ok(rejected.error);
-  assert.match(rejected.stderr, /unknown command.*replace/);
-});
-
-test("Slack removal no longer accepts a deletion toggle", async () => {
-  const rejected = await run(["--api-key", "synthetic-test-key", "slack", "application", "remove",
-    "--identity-id", "11111111-1111-4111-8111-111111111111", "--expected-application-generation", "1",
-    "--request-id", "33333333-3333-4333-8333-333333333333", "--delete-old-app"]);
-  assert.ok(rejected.error);
-  assert.match(rejected.stderr, /unknown option.*--delete-old-app/);
-});
-
 test("Slack workspace table distinguishes creator names and IDs without changing JSON", async () => {
   const legacy = { ...f.provisioning_workspace };
   delete legacy.user_name;

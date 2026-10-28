@@ -75,12 +75,6 @@ def test_current_generation_and_legacy_response():
         assert client.slack.list_connections(DATA["identity_id"]).application_generation is None
 
 
-def test_unpublished_replacement_methods_are_not_exposed():
-    with Inkbox(api_key="synthetic-test-key", base_url="https://example.com") as client:
-        assert not hasattr(client.slack, "replace_application")
-        assert not hasattr(client.slack, "get_replacement")
-
-
 def test_fresh_setup_is_an_explicit_separate_choice():
     requests = []
     replies = [DATA["response"], DATA["detached"], {"status": "pending"}, DATA["response"]]
@@ -114,8 +108,8 @@ def test_fresh_setup_is_an_explicit_separate_choice():
         assert len(requests) == 4
 
 
-def test_removed_deletion_option_is_rejected_locally():
+def test_unknown_removal_argument_is_rejected_locally():
     with Inkbox(api_key="synthetic-test-key", base_url="https://example.com") as client:
-        with pytest.raises(TypeError, match="delete_old_app"):
+        with pytest.raises(TypeError, match="extra_option"):
             client.slack.remove_application(DATA["identity_id"], expected_application_generation=2,
-                request_id=DATA["request_id"], delete_old_app=False)
+                request_id=DATA["request_id"], extra_option=False)

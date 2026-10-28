@@ -134,7 +134,10 @@ export function registerSlackCommands(program: Command): void {
     ) {
       const opts = getGlobalOpts(this);
       const client = createClient(opts);
-      output(await client.slack.removeApplication(await resolveIdentityId(client, o), o), { json: !!opts.json });
+      output(await client.slack.removeApplication(await resolveIdentityId(client, o), {
+        expectedApplicationGeneration: o.expectedApplicationGeneration,
+        requestId: o.requestId,
+      }), { json: !!opts.json });
     }));
   applications.command("removal-status")
     .description("Read removal and remote deletion progress")

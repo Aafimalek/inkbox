@@ -1552,7 +1552,7 @@ Tokens are write-only; never put them in command arguments or output.
 Pass the saved ID to `start_setup` (Python/Rust), `startSetup` (TypeScript), or
 `slack setup start --provisioning-workspace-id <uuid>`.
 Poll connection reads until `setup.status` is `ready`, with a bounded wait and a few
-seconds between reads. For `needs_credentials`, update workspace credentials first.
+seconds between reads. For `needs_credentials`, select a saved workspace or save valid configuration credentials.
 Do not blindly retry an unknown setup outcome. Start installation only when ready.
 Open the returned URL in a browser; treat the full URL as a secret. After approval,
 list connections again to confirm the expected workspace is connected. The app is
@@ -1560,6 +1560,41 @@ bound to its chosen workspace; no client-invitation workflow is supported.
 Join accessible
 public channels or invite the agent to selected private channels. Slack Connect is
 supported when the selected connection has access.
+
+**App removal (0.7.23+).** For user-requested app removal, use an organization admin API key;
+claimed agent keys cannot remove apps or read removal status. Removal is not the
+default repair for a reauthorization error. Read the connection list and check
+`application_created` / `applicationCreated` before using its application generation.
+Generate a fresh request UUID once and save it with that generation before removal;
+retry uncertain requests with those same values, not a newly read generation.
+The removal operation ID equals its saved request UUID.
+
+Use `admin_client` authenticated with an organization admin key:
+
+```python
+from uuid import uuid4
+
+current = admin_client.slack.list_connections(identity_id)
+if not current.application_created or current.application_generation is None:
+    raise RuntimeError("No Slack app is available to remove")
+generation = current.application_generation
+request_id = uuid4()  # Save both values before removal; reuse them on retries.
+removed = admin_client.slack.remove_application(
+    identity_id, expected_application_generation=generation, request_id=request_id,
+)
+status = admin_client.slack.get_application_removal(removed.operation_id)
+```
+
+Poll the saved operation ID every few seconds with a bounded wait while deletion
+is `pending`, including when the error is `credentials_busy`. `failed` and `unknown`
+are terminal; replay does not retry deletion. Removal always attempts permanent
+Slack-side deletion, but credential errors or timeouts do not prove the app is gone.
+If needed, check and delete the original app in Slack with its original creator.
+Removal never prepares another app. Previous connection history becomes unavailable;
+the Inkbox identity, other channels, and memory are unchanged. For a fresh app, select
+the intended saved workspace-and-creator record (or save another token pair), start
+setup explicitly, wait until ready, authorize installation, and invite the new bot
+back to channels. A retained non-null app generation does not mean an app exists.
 
 Use explicit connection IDs and stable caller-provided idempotency keys for sends and
 utility mutations (reactions, pins, own-message edits/deletions, join/leave, uploads,

@@ -292,8 +292,9 @@ export class SlackResource extends SlackOperationsResource {
     identityId: string,
     options: SlackRemoveApplicationOptions,
   ): Promise<SlackApplicationRemoval> {
-    if ("deleteOldApp" in options) {
-      throw new TypeError("deleteOldApp is not supported; app removal always attempts deletion.");
+    if (!options || typeof options !== "object" || Array.isArray(options)
+        || Object.keys(options).some((key) => key !== "expectedApplicationGeneration" && key !== "requestId")) {
+      throw new TypeError("Provide expectedApplicationGeneration and requestId only.");
     }
     return applicationRemoval(await this.http.post<RawApplicationRemoval>(
       "/slack/applications/remove", {

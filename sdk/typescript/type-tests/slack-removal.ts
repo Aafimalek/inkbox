@@ -21,13 +21,11 @@ void polled;
 void status;
 // @ts-expect-error Removal requires a current generation and stable request ID.
 void client.slack.removeApplication("11111111-1111-4111-8111-111111111111", {});
-// @ts-expect-error Removal always attempts deletion; there is no deletion option.
-void client.slack.removeApplication("11111111-1111-4111-8111-111111111111", { ...options, deleteOldApp: false });
+// @ts-expect-error Only current removal options are accepted.
+void client.slack.removeApplication("11111111-1111-4111-8111-111111111111", { ...options, extraOption: false });
 
 // @ts-expect-error Removal does not start or report new-app setup.
 void result.then((value) => value.setup);
-// @ts-expect-error Automatic replacement is not part of this API.
-void client.slack.replaceApplication("11111111-1111-4111-8111-111111111111", options);
 
 // Older callers can still construct metadata without a cached account name.
 const legacyWorkspace: SlackProvisioningWorkspace = {

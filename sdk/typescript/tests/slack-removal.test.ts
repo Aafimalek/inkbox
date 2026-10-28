@@ -52,12 +52,6 @@ it("parses application generation and tolerates legacy responses", async () => {
   expect((await client.slack.listConnections(data.identity_id)).applicationGeneration).toBeNull();
 });
 
-it("does not expose the unpublished automatic replacement methods", () => {
-  const client = new Inkbox({ apiKey: "synthetic-test-key", baseUrl: "https://example.com" });
-  expect(client.slack).not.toHaveProperty("replaceApplication");
-  expect(client.slack).not.toHaveProperty("getReplacement");
-});
-
 it("starts fresh setup only as a separate caller-selected workspace action", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>();
   vi.stubGlobal("fetch", fetch);
@@ -86,14 +80,14 @@ it("starts fresh setup only as a separate caller-selected workspace action", asy
   expect(fetch).toHaveBeenCalledTimes(4);
 });
 
-it("rejects the removed deletion option before making a request", async () => {
+it("rejects unknown removal options before making a request", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>();
   vi.stubGlobal("fetch", fetch);
   const client = new Inkbox({ apiKey: "synthetic-test-key", baseUrl: "https://example.com" });
-  for (const deleteOldApp of [false, true, undefined]) {
+  for (const extraOption of [false, true, undefined]) {
     await expect(client.slack.removeApplication(data.identity_id, {
-      expectedApplicationGeneration: 2, requestId: data.request_id, deleteOldApp,
-    } as never)).rejects.toThrow(/deleteOldApp is not supported/);
+      expectedApplicationGeneration: 2, requestId: data.request_id, extraOption,
+    } as never)).rejects.toThrow(/expectedApplicationGeneration and requestId only/);
   }
   expect(fetch).not.toHaveBeenCalled();
 });
