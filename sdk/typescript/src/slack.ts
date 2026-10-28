@@ -42,7 +42,6 @@ export interface SlackApplicationRemoval {
 export interface SlackRemoveApplicationOptions {
   expectedApplicationGeneration: number;
   requestId: string;
-  deleteOldApp?: boolean;
 }
 export interface SlackProvisioningWorkspace {
   id: string;
@@ -284,22 +283,24 @@ export class SlackResource extends SlackOperationsResource {
   }
   /** Remove an app with organization management credentials; no new app is created.
    * Reuse requestId and arguments after an uncertain outcome. Previous connection history
-   * is no longer accessible. Remote app deletion defaults to false. Connect again
+   * is no longer accessible. Removal always attempts remote deletion. Connect again
    * explicitly to choose a workspace and create a fresh app. */
   async removeApplication(
     identityId: string,
     options: SlackRemoveApplicationOptions,
   ): Promise<SlackApplicationRemoval> {
+    if ("deleteOldApp" in options) {
+      throw new TypeError("deleteOldApp is not supported; app removal always attempts deletion.");
+    }
     return applicationRemoval(await this.http.post<RawApplicationRemoval>(
       "/slack/applications/remove", {
         identity_id: identityId,
         expected_application_generation: options.expectedApplicationGeneration,
         request_id: options.requestId,
-        delete_old_app: options.deleteOldApp ?? false,
       },
     ));
   }
-  /** Read removal and optional deletion progress with management credentials. */
+  /** Read removal and remote deletion progress with management credentials. */
   async getApplicationRemoval(operationId: string): Promise<SlackApplicationRemoval> {
     return applicationRemoval(await this.http.get<RawApplicationRemoval>(
       `/slack/applications/removals/${encodeURIComponent(operationId)}`,

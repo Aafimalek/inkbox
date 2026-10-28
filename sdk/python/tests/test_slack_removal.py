@@ -11,8 +11,7 @@ from inkbox import Inkbox, SlackApplicationRemoval
 DATA = json.loads((Path(__file__).parents[3] / "tests/fixtures/slack_removal.json").read_text())
 
 
-@pytest.mark.parametrize("delete_old_app", [False, True])
-def test_removal_wire_request_does_not_create_another_app(delete_old_app):
+def test_removal_wire_request_does_not_create_another_app():
     requests = []
 
     def handle(request):
@@ -25,8 +24,6 @@ def test_removal_wire_request_does_not_create_another_app(delete_old_app):
             base_url="https://example.com/api/v1", transport=httpx.MockTransport(handle)
         )
         args = {"expected_application_generation": 2, "request_id": UUID(DATA["request_id"])}
-        if delete_old_app:
-            args["delete_old_app"] = True
         result = client.slack.remove_application(DATA["identity_id"], **args)
         assert isinstance(result, SlackApplicationRemoval)
         assert result.operation_id == UUID(DATA["request_id"])
@@ -40,12 +37,12 @@ def test_removal_wire_request_does_not_create_another_app(delete_old_app):
             assert request.url.path == "/api/v1/slack/applications/remove"
             assert json.loads(request.content) == {
                 "identity_id": DATA["identity_id"], "expected_application_generation": 2,
-                "request_id": DATA["request_id"], "delete_old_app": delete_old_app,
+                "request_id": DATA["request_id"],
             }
 
 
 @pytest.mark.parametrize("status", ["not_requested", "pending", "deleted", "already_deleted", "failed", "unknown"])
-def test_poll_keeps_removed_status_separate_from_optional_deletion(status):
+def test_poll_keeps_removed_status_separate_from_remote_deletion(status):
     requests = []
 
     def handle(request):
@@ -115,3 +112,10 @@ def test_fresh_setup_is_an_explicit_separate_choice():
         assert polled.status == "removed"
         assert not hasattr(polled, "setup")
         assert len(requests) == 4
+
+
+def test_removed_deletion_option_is_rejected_locally():
+    with Inkbox(api_key="synthetic-test-key", base_url="https://example.com") as client:
+        with pytest.raises(TypeError, match="delete_old_app"):
+            client.slack.remove_application(DATA["identity_id"], expected_application_generation=2,
+                request_id=DATA["request_id"], delete_old_app=False)

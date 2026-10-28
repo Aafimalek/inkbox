@@ -72,10 +72,6 @@ pub struct SlackApplicationRemoval {
     #[serde(default)]
     pub deletion_error_code: Option<String>,
 }
-#[derive(Debug, Clone, Default)]
-pub struct SlackRemoveApplicationOptions {
-    pub delete_old_app: bool,
-}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SlackSetupState {
@@ -276,14 +272,13 @@ impl SlackResource {
     }
     /// Remove an app with management credentials without creating a new app.
     /// Reuse request_id and arguments after an uncertain outcome. Previous connection
-    /// history is no longer accessible. Remote app deletion defaults to false.
+    /// history is no longer accessible. Removal always attempts remote deletion.
     /// Connect again explicitly to choose a workspace and create a fresh app.
     pub fn remove_application(
         &self,
         identity_id: Uuid,
         expected_application_generation: u64,
         request_id: Uuid,
-        options: &SlackRemoveApplicationOptions,
     ) -> Result<SlackApplicationRemoval> {
         Ok(serde_json::from_value(self.http.post(
             "/slack/applications/remove",
@@ -291,12 +286,11 @@ impl SlackResource {
                 "identity_id": identity_id,
                 "expected_application_generation": expected_application_generation,
                 "request_id": request_id,
-                "delete_old_app": options.delete_old_app,
             })),
             NO_QUERY,
         )?)?)
     }
-    /// Read removal and optional deletion progress with management credentials.
+    /// Read removal and remote deletion progress with management credentials.
     pub fn get_application_removal(&self, operation_id: Uuid) -> Result<SlackApplicationRemoval> {
         Ok(serde_json::from_value(self.http.get(
             &format!("/slack/applications/removals/{operation_id}"),

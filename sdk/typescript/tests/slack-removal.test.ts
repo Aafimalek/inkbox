@@ -5,26 +5,25 @@ import { Inkbox, type SlackApplicationRemoval } from "../src/index.js";
 const data = JSON.parse(readFileSync(new URL("../../../tests/fixtures/slack_removal.json", import.meta.url), "utf8"));
 afterEach(() => vi.unstubAllGlobals());
 
-it.each([false, true])("sends exact removal and retry arguments without creating another app (delete=%s)", async (deleteOldApp) => {
+it("sends the three-field removal request without creating another app", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>();
   vi.stubGlobal("fetch", fetch);
   const client = new Inkbox({ apiKey: "synthetic-test-key", baseUrl: "https://example.com" });
-  const options = { expectedApplicationGeneration: 2, requestId: data.request_id,
-    ...(deleteOldApp ? { deleteOldApp: true } : {}) };
+  const options = { expectedApplicationGeneration: 2, requestId: data.request_id };
   for (let attempt = 0; attempt < 2; attempt++) {
     fetch.mockResolvedValueOnce(new Response(JSON.stringify(data.response), { status: 202 }));
     const result: SlackApplicationRemoval = await client.slack.removeApplication(data.identity_id, options);
     expect(result.operationId).toBe(data.request_id);
     expect(result.status).toBe("removed");
     expect(result).not.toHaveProperty("setup");
-    expect(result.deletionStatus).toBe("not_requested");
+    expect(result.deletionStatus).toBe("pending");
   }
   expect(fetch).toHaveBeenCalledTimes(2);
   for (const [url, request] of fetch.mock.calls) {
     expect(new URL(String(url)).pathname).toBe("/api/v1/slack/applications/remove");
     expect(request?.method).toBe("POST");
     expect(JSON.parse(String(request?.body))).toEqual({ identity_id: data.identity_id,
-      expected_application_generation: 2, request_id: data.request_id, delete_old_app: deleteOldApp });
+      expected_application_generation: 2, request_id: data.request_id });
   }
 });
 
@@ -82,7 +81,19 @@ it("starts fresh setup only as a separate caller-selected workspace action", asy
   });
   fetch.mockResolvedValueOnce(new Response(JSON.stringify(data.response)));
   expect(await client.slack.getApplicationRemoval(removed.operationId)).toEqual({
-    operationId: data.request_id, status: "removed", deletionStatus: "not_requested", deletionErrorCode: null,
+    operationId: data.request_id, status: "removed", deletionStatus: "pending", deletionErrorCode: null,
   });
   expect(fetch).toHaveBeenCalledTimes(4);
+});
+
+it("rejects the removed deletion option before making a request", async () => {
+  const fetch = vi.fn<typeof globalThis.fetch>();
+  vi.stubGlobal("fetch", fetch);
+  const client = new Inkbox({ apiKey: "synthetic-test-key", baseUrl: "https://example.com" });
+  for (const deleteOldApp of [false, true, undefined]) {
+    await expect(client.slack.removeApplication(data.identity_id, {
+      expectedApplicationGeneration: 2, requestId: data.request_id, deleteOldApp,
+    } as never)).rejects.toThrow(/deleteOldApp is not supported/);
+  }
+  expect(fetch).not.toHaveBeenCalled();
 });

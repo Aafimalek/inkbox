@@ -81,23 +81,17 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
     );
     const operationId = "33333333-3333-4333-8333-333333333333";
     const removal = { operation_id: operationId, status: "removed",
-      deletion_status: "not_requested", deletion_error_code: null };
+      deletion_status: "pending", deletion_error_code: null };
     const removed = await check(
       ["slack", "application", "remove", "--identity-id", i,
         "--expected-application-generation", "2", "--request-id", operationId],
       removal, "POST", "/api/v1/slack/applications/remove",
-      { identity_id: i, expected_application_generation: 2, request_id: operationId, delete_old_app: false },
+      { identity_id: i, expected_application_generation: 2, request_id: operationId },
     );
     assert.equal(removed.operationId, operationId);
-    assert.equal(removed.deletionStatus, "not_requested");
+    assert.equal(removed.deletionStatus, "pending");
     assert.equal(removed.status, "removed");
     assert.equal(removed.setup, undefined);
-    await check(
-      ["slack", "application", "remove", "--identity-id", i,
-        "--expected-application-generation", "2", "--request-id", operationId, "--delete-old-app"],
-      { ...removal, deletion_status: "pending" }, "POST", "/api/v1/slack/applications/remove",
-      { identity_id: i, expected_application_generation: 2, request_id: operationId, delete_old_app: true },
-    );
     await check(
       ["slack", "application", "removal-status", "--operation-id", operationId],
       { ...removal, deletion_status: "already_deleted" }, "GET",
@@ -280,7 +274,7 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
       `/api/v1/webhooks/subscriptions/${f.subscription.id}`,
       { url: "https://example.com/new" },
     );
-    assert.equal(requests.length, 29);
+    assert.equal(requests.length, 28);
     const rejected = await run([
       ...globals,
       "slack",
@@ -295,7 +289,7 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
     ]);
     assert.ok(rejected.error);
     assert.match(rejected.stderr, /idempotency-key/);
-    assert.equal(requests.length, 29);
+    assert.equal(requests.length, 28);
     const missingRecipient = await run([
       ...globals,
       "slack",
@@ -306,7 +300,7 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
     ]);
     assert.ok(missingRecipient.error);
     assert.match(missingRecipient.stderr, /required option.*--user-id/);
-    assert.equal(requests.length, 29);
+    assert.equal(requests.length, 28);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await rm(tmp, { recursive: true, force: true });
@@ -362,11 +356,11 @@ test("identity-scoped Slack commands resolve handles and reject ambiguous select
       args: ["application", "remove", "--expected-application-generation", "2",
         "--request-id", "33333333-3333-4333-8333-333333333333"],
       response: { operation_id: "33333333-3333-4333-8333-333333333333",
-        status: "removed", deletion_status: "not_requested", deletion_error_code: null },
+        status: "removed", deletion_status: "pending", deletion_error_code: null },
       method: "POST",
       url: "/api/v1/slack/applications/remove",
       body: { identity_id: identityId, expected_application_generation: 2,
-        request_id: "33333333-3333-4333-8333-333333333333", delete_old_app: false },
+        request_id: "33333333-3333-4333-8333-333333333333" },
     },
     {
       args: ["setup", "start", "--provisioning-workspace-id", f.provisioning_workspace.id],
@@ -560,4 +554,12 @@ test("Slack automatic app replacement command is unavailable", async () => {
   const rejected = await run(["--api-key", "synthetic-test-key", "slack", "application", "replace"]);
   assert.ok(rejected.error);
   assert.match(rejected.stderr, /unknown command.*replace/);
+});
+
+test("Slack removal no longer accepts a deletion toggle", async () => {
+  const rejected = await run(["--api-key", "synthetic-test-key", "slack", "application", "remove",
+    "--identity-id", "11111111-1111-4111-8111-111111111111", "--expected-application-generation", "1",
+    "--request-id", "33333333-3333-4333-8333-333333333333", "--delete-old-app"]);
+  assert.ok(rejected.error);
+  assert.match(rejected.stderr, /unknown option.*--delete-old-app/);
 });

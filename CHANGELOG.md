@@ -14,7 +14,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   or `slack application removal-status`.
 - Read `application_generation` / `applicationGeneration` from connection lists
   and provide it with a request UUID to protect removal retries.
-- Optional permanent deletion of the old app, disabled by default, with its own
+- Removal always attempts permanent deletion of the old app, with a separate
   deletion outcome. Confirmed already-deleted apps need no further deletion.
 
 ### Changed

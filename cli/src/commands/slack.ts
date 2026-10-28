@@ -121,17 +121,16 @@ export function registerSlackCommands(program: Command): void {
     .description("Remove the app without creating another; connect again explicitly when ready")
     .requiredOption("--expected-application-generation <n>", "Current application generation from connection list", slackInteger)
     .requiredOption("--request-id <uuid>", "Request UUID; reuse with identical arguments when retrying")
-    .option("--delete-old-app", "Also permanently delete the old app from Slack", false)
     .action(withErrorHandler(async function (
       this: Command,
-      o: IdentityOptions & { expectedApplicationGeneration: number; requestId: string; deleteOldApp: boolean },
+      o: IdentityOptions & { expectedApplicationGeneration: number; requestId: string },
     ) {
       const opts = getGlobalOpts(this);
       const client = createClient(opts);
       output(await client.slack.removeApplication(await resolveIdentityId(client, o), o), { json: !!opts.json });
     }));
   applications.command("removal-status")
-    .description("Read removal and optional deletion progress")
+    .description("Read removal and remote deletion progress")
     .requiredOption("--operation-id <uuid>", "Operation UUID returned by application remove")
     .action(withErrorHandler(async function (this: Command, o: { operationId: string }) {
       const opts = getGlobalOpts(this);

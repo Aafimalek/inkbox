@@ -1127,8 +1127,8 @@ inkbox slack application removal-status \
 ```
 
 Save the request ID and generation before removing. Retry with the same ID and
-identical arguments after an uncertain request outcome. Add `--delete-old-app`
-only to permanently delete the old app from Slack; it defaults to off.
+identical arguments after an uncertain request outcome. Removal always attempts
+permanent deletion of the old app from Slack; there is no deletion toggle.
 The result reports `status: removed` and a separate deletion outcome. Confirmed
 already absent is successful; credential errors and timeouts are not proof of
 remote deletion. Removal never prepares or installs another app.

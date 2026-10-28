@@ -49,7 +49,7 @@ class SlackConnectionsResponse:
 
 @dataclass
 class SlackApplicationRemoval:
-    """App removal and the independent optional deletion outcome."""
+    """App removal and the independent remote deletion outcome."""
 
     operation_id: UUID
     status: Literal["removed"]
@@ -204,27 +204,25 @@ class SlackResource(SlackOperationsMixin):
         *,
         expected_application_generation: int,
         request_id: UUID | str,
-        delete_old_app: bool = False,
     ) -> SlackApplicationRemoval:
         """Remove an app using organization management credentials.
 
         Read the current generation with ``list_connections``. Reuse the same
         request ID and arguments after an uncertain request outcome. No new app
         is created. Previous connection history is no longer accessible.
-        Remote app deletion is optional and defaults to false. Connect again
-        explicitly to choose a workspace and create a fresh app.
+        Removal always attempts permanent deletion of the old app from Slack.
+        Connect again explicitly to choose a workspace and create a fresh app.
         """
         return _parse(SlackApplicationRemoval, self._http.post(
             "/slack/applications/remove", json={
                 "identity_id": str(identity_id),
                 "expected_application_generation": expected_application_generation,
                 "request_id": str(request_id),
-                "delete_old_app": delete_old_app,
             },
         ))
 
     def get_application_removal(self, operation_id: UUID | str) -> SlackApplicationRemoval:
-        """Read removal and optional deletion progress with management credentials."""
+        """Read removal and remote deletion progress with management credentials."""
         return _parse(SlackApplicationRemoval, self._http.get(
             f"/slack/applications/removals/{quote(str(operation_id), safe='')}",
         ))

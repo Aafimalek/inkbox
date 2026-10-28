@@ -1971,8 +1971,9 @@ private contact sessions. Unknown notice codes/levels remain available to caller
 With organization management credentials, use `client.slack.removeApplication`
 to remove an identity's app without creating another. Supply `expectedApplicationGeneration`
 from `listConnections` and a `requestId` UUID; reuse both with identical arguments
-when retrying an uncertain request. `deleteOldApp` defaults to `false`; set it to `true` only to permanently delete the old app from Slack.
-Read removal and optional deletion progress with `getApplicationRemoval`.
+when retrying an uncertain request. Removal always attempts permanent deletion of
+the old app from Slack. Read removal and remote deletion progress with
+`getApplicationRemoval`. Already-deleted apps need no further deletion.
 The result has `status` set to `removed` and does not include new-app setup.
 
 When ready, connect again explicitly: choose a saved workspace or save credentials

@@ -4,7 +4,7 @@
   "expected_application_generation": 2,
   "response": {
     "operation_id": "33333333-3333-4333-8333-333333333333",
-    "deletion_status": "not_requested",
+    "deletion_status": "pending",
     "deletion_error_code": null,
     "status": "removed"
   },

@@ -1926,8 +1926,9 @@ inkbox.mailboxes.update("alex@example.com", signature_enabled=False)
 With organization management credentials, use `client.slack.remove_application`
 to remove an identity's app without creating another. Supply `expected_application_generation`
 from `list_connections` and a `request_id` UUID; reuse both with identical arguments
-when retrying an uncertain request. `delete_old_app=False` keeps the old app in Slack; set it to `True` only to permanently delete that app.
-Read removal and optional deletion progress with `get_application_removal`.
+when retrying an uncertain request. Removal always attempts permanent deletion of
+the old app from Slack. Read removal and remote deletion progress with
+`get_application_removal`. Already-deleted apps need no further deletion.
 The result has `status` set to `removed` and does not include new-app setup.
 
 When ready, connect again explicitly: choose a saved workspace or save credentials

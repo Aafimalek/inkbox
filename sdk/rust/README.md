@@ -921,8 +921,9 @@ authority and must not trigger history loading.
 With organization management credentials, use `client.slack().remove_application`
 to remove an identity's app without creating another. Supply `expected_application_generation`
 from `list_connections` and a `request_id` UUID; reuse both with identical arguments
-when retrying an uncertain request. Pass `&SlackRemoveApplicationOptions`; its default leaves the old app in Slack. Set `delete_old_app: true` only to permanently delete that app.
-Read removal and optional deletion progress with `get_application_removal`.
+when retrying an uncertain request. Removal always attempts permanent deletion of
+the old app from Slack. Read removal and remote deletion progress with
+`get_application_removal`. Already-deleted apps need no further deletion.
 The result has `status` set to `removed` and does not include new-app setup.
 
 When ready, connect again explicitly: choose a saved workspace or save credentials
