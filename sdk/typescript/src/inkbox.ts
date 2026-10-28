@@ -39,6 +39,7 @@ import { VaultResource } from "./vault/resources/vault.js";
 import { ContactsResource } from "./contacts/resources/contacts.js";
 import { CompanionResource } from "./companion.js";
 import { NotesResource } from "./notes/resources/notes.js";
+import { BillingResource } from "./billing.js";
 import { TunnelsResource } from "./tunnels/resources/tunnels.js";
 import { ApiKeysResource } from "./api_keys/resources/apiKeys.js";
 import { AgentIdentity } from "./agent_identity.js";
@@ -188,6 +189,7 @@ export class Inkbox {
   readonly _vaultResource: VaultResource;
   readonly _contacts: ContactsResource;
   readonly _notes: NotesResource;
+  readonly billing: BillingResource;
   readonly _tunnels: TunnelsResource;
   readonly _apiKeys: ApiKeysResource;
   readonly _rootApiHttp: HttpTransport;
@@ -284,6 +286,7 @@ export class Inkbox {
     this.messageSends = new MessageSendsResource(apiHttp, this._mailboxes);
     this.companion = new CompanionResource(apiHttp);
     this._notes = new NotesResource(apiHttp);
+    this.billing = new BillingResource(apiHttp);
     this._tunnels = new TunnelsResource(apiHttp);
     this._apiKeys = new ApiKeysResource(apiHttp);
     this.slack = new SlackResource(apiHttp);

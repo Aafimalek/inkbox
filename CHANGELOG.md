@@ -4,19 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.7.22 - OAuth for Voice AI connections (unreleased)
-
-### Added
-
-- OAuth configuration and browser authorization start, status, cancel, and disconnect methods in Python, TypeScript, and Rust.
-- `inkbox phone hosted-agent mcp oauth` commands for browser approval and bounded status polling.
-- Connection authorization status, expiry, requested and granted scopes, and reconnect guidance.
-
-### Changed
-
-- Authentication views accept additional modes. Rust callers constructing `HostedMcpAuthView` directly must supply the new status fields, and exhaustive `McpAuth` matches must handle `OAuth`.
-
-## 0.7.21 - Voice AI external connections (unreleased)
+## 0.7.23 - Voice AI external connections and OAuth (unreleased)
 
 ### Added
 
@@ -28,12 +16,28 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   a JSON file or stdin.
 - Voice catalogs expose `mcp_supported` (Python/Rust) or `mcpSupported`
   (TypeScript) so clients can check compatibility.
+- OAuth configuration and browser authorization start, status, cancel, and disconnect methods in Python, TypeScript, and Rust.
+- `inkbox phone hosted-agent mcp oauth` commands for browser approval and bounded status polling.
+- Connection authorization status, expiry, requested and granted scopes, and reconnect guidance.
 
 ### Changed
 
 - **Source-breaking for manually constructed voice options:**
   `HostedAgentVoiceOption` adds required `mcpSupported` in TypeScript and
   `mcp_supported` in Rust struct literals. Parsed older responses default to false.
+- Authentication views accept additional modes. Rust callers constructing `HostedMcpAuthView` directly must supply the new status fields, and exhaustive `McpAuth` matches must handle `OAuth`.
+
+## 0.7.22
+
+### Added
+
+- Line bundle billing in Python, TypeScript, Rust and the CLI: preview prorated fees and organization-wide usage credits, purchase additional VoIP or personal dedicated iMessage capacity, and cancel or resume renewal. Canceling requires an unused line slot; paid credits remain until expiry.
+
+## 0.7.21
+
+### Added
+
+- Organization-admin billing resources in Python, TypeScript, and Rust, plus `inkbox billing` commands: read contracted usage rates, preview and purchase calling destinations, and cancel or resume renewals. Purchase retries reuse an explicit request key. Select several destinations with `quote_countries` / `quoteCountries` and `purchase_countries` / `purchaseCountries`, or CLI `quote-many` / `purchase-many`, to pay on one invoice while keeping renewals independently cancelable. Quotes include itemized prorated destination charges.
 
 ## 0.7.20 - iMessage line roles (unreleased)
 
