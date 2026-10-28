@@ -1,0 +1,24 @@
+{
+  "identity_id": "11111111-1111-4111-8111-111111111111",
+  "request_id": "33333333-3333-4333-8333-333333333333",
+  "expected_application_generation": 2,
+  "response": {
+    "operation_id": "33333333-3333-4333-8333-333333333333",
+    "deletion_status": "not_requested",
+    "deletion_error_code": null,
+    "status": "removed"
+  },
+  "fresh_provisioning_workspace_id": "55555555-5555-4555-8555-555555555555",
+  "detached": {
+    "connections": [],
+    "installation_available": false,
+    "application_created": false,
+    "application_generation": 3,
+    "setup": {
+      "status": "needs_credentials",
+      "provisioning_workspace_id": null,
+      "error_code": "credentials_required",
+      "retry_at": null
+    }
+  }
+}

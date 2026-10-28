@@ -59,16 +59,21 @@ pub enum SlackAppDeletionStatus {
     Failed,
     Unknown,
 }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SlackApplicationRemovalStatus {
+    Removed,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SlackApplicationReplacement {
+pub struct SlackApplicationRemoval {
     pub operation_id: Uuid,
-    pub setup: SlackSetupStatus,
+    pub status: SlackApplicationRemovalStatus,
     pub deletion_status: SlackAppDeletionStatus,
     #[serde(default)]
     pub deletion_error_code: Option<String>,
 }
 #[derive(Debug, Clone, Default)]
-pub struct SlackReplaceApplicationOptions {
+pub struct SlackRemoveApplicationOptions {
     pub delete_old_app: bool,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -269,18 +274,19 @@ impl SlackResource {
             NO_QUERY,
         )?)?)
     }
-    /// Replace an app with organization management credentials, then authorize the new app.
+    /// Remove an app with management credentials without creating a new app.
     /// Reuse request_id and arguments after an uncertain outcome. Previous connection
     /// history is no longer accessible. Remote app deletion defaults to false.
-    pub fn replace_application(
+    /// Connect again explicitly to choose a workspace and create a fresh app.
+    pub fn remove_application(
         &self,
         identity_id: Uuid,
         expected_application_generation: u64,
         request_id: Uuid,
-        options: &SlackReplaceApplicationOptions,
-    ) -> Result<SlackApplicationReplacement> {
+        options: &SlackRemoveApplicationOptions,
+    ) -> Result<SlackApplicationRemoval> {
         Ok(serde_json::from_value(self.http.post(
-            "/slack/applications/replace",
+            "/slack/applications/remove",
             Some(&json!({
                 "identity_id": identity_id,
                 "expected_application_generation": expected_application_generation,
@@ -290,10 +296,10 @@ impl SlackResource {
             NO_QUERY,
         )?)?)
     }
-    /// Read replacement progress with organization management credentials.
-    pub fn get_replacement(&self, operation_id: Uuid) -> Result<SlackApplicationReplacement> {
+    /// Read removal and optional deletion progress with management credentials.
+    pub fn get_application_removal(&self, operation_id: Uuid) -> Result<SlackApplicationRemoval> {
         Ok(serde_json::from_value(self.http.get(
-            &format!("/slack/applications/replacements/{operation_id}"),
+            &format!("/slack/applications/removals/{operation_id}"),
             NO_QUERY,
         )?)?)
     }

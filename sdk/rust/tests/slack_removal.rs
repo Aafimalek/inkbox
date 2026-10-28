@@ -1,17 +1,16 @@
 use httpmock::{Method::GET, Method::POST, MockServer};
-use inkbox::{Inkbox, SlackAppDeletionStatus, SlackReplaceApplicationOptions, SlackSetupState};
+use inkbox::{
+    Inkbox, SlackAppDeletionStatus, SlackApplicationRemovalStatus, SlackRemoveApplicationOptions,
+};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
 fn data() -> Value {
-    serde_json::from_str(include_str!(
-        "../../../tests/fixtures/slack_replacement.json"
-    ))
-    .unwrap()
+    serde_json::from_str(include_str!("../../../tests/fixtures/slack_removal.json")).unwrap()
 }
 
 #[test]
-fn replacement_preserves_request_identity_and_defaults_remote_deletion_off() {
+fn removal_preserves_request_identity_without_creating_another_app() {
     let data = data();
     let server = MockServer::start();
     let client = Inkbox::builder("synthetic-test-key")
@@ -23,7 +22,7 @@ fn replacement_preserves_request_identity_and_defaults_remote_deletion_off() {
     for delete in [false, true] {
         let mut expected = server.mock(|when, then| {
             when.method(POST)
-                .path("/api/v1/slack/applications/replace")
+                .path("/api/v1/slack/applications/remove")
                 .json_body(
                     json!({"identity_id": identity, "expected_application_generation": 2,
                     "request_id": operation, "delete_old_app": delete}),
@@ -31,23 +30,23 @@ fn replacement_preserves_request_identity_and_defaults_remote_deletion_off() {
             then.status(202).json_body(data["response"].clone());
         });
         let options = if delete {
-            SlackReplaceApplicationOptions {
+            SlackRemoveApplicationOptions {
                 delete_old_app: true,
             }
         } else {
-            SlackReplaceApplicationOptions::default()
+            SlackRemoveApplicationOptions::default()
         };
         for _ in 0..2 {
             let result = client
                 .slack()
-                .replace_application(identity, 2, operation, &options)
+                .remove_application(identity, 2, operation, &options)
                 .unwrap();
             assert_eq!(result.operation_id, operation);
-            assert_eq!(result.setup.status, SlackSetupState::Pending);
-            assert_eq!(
-                result.setup.retry_at.as_deref(),
-                Some("2026-10-27T12:00:00Z")
-            );
+            assert_eq!(result.status, SlackApplicationRemovalStatus::Removed);
+            assert!(serde_json::to_value(&result)
+                .unwrap()
+                .get("setup")
+                .is_none());
             assert_eq!(result.deletion_status, SlackAppDeletionStatus::NotRequested);
         }
         expected.assert_hits(2);
@@ -56,7 +55,7 @@ fn replacement_preserves_request_identity_and_defaults_remote_deletion_off() {
 }
 
 #[test]
-fn deletion_outcomes_remain_independent_from_setup() {
+fn deletion_outcomes_remain_independent_from_removed_status() {
     let data = data();
     let server = MockServer::start();
     let client = Inkbox::builder("synthetic-test-key")
@@ -80,14 +79,17 @@ fn deletion_outcomes_remain_independent_from_setup() {
             Value::Null
         };
         let mut mock = server.mock(|when, then| {
-            when.method(GET).path(format!(
-                "/api/v1/slack/applications/replacements/{operation}"
-            ));
+            when.method(GET)
+                .path(format!("/api/v1/slack/applications/removals/{operation}"));
             then.status(200).json_body(response);
         });
-        let result = client.slack().get_replacement(operation).unwrap();
+        let result = client.slack().get_application_removal(operation).unwrap();
         assert_eq!(result.deletion_status, expected);
-        assert_eq!(result.setup.status, SlackSetupState::Pending);
+        assert_eq!(result.status, SlackApplicationRemovalStatus::Removed);
+        assert!(serde_json::to_value(&result)
+            .unwrap()
+            .get("setup")
+            .is_none());
         assert_eq!(
             result.deletion_error_code.as_deref(),
             if status == "failed" {
@@ -132,4 +134,71 @@ fn generation_parses_and_older_responses_remain_supported() {
         mock.assert();
         mock.delete();
     }
+}
+
+#[test]
+fn fresh_setup_requires_a_separate_workspace_choice() {
+    let data = data();
+    let server = MockServer::start();
+    let client = Inkbox::builder("synthetic-test-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    let identity = Uuid::parse_str(data["identity_id"].as_str().unwrap()).unwrap();
+    let operation = Uuid::parse_str(data["request_id"].as_str().unwrap()).unwrap();
+    let workspace =
+        Uuid::parse_str(data["fresh_provisioning_workspace_id"].as_str().unwrap()).unwrap();
+    let remove = server.mock(|when, then| {
+        when.method(POST).path("/api/v1/slack/applications/remove");
+        then.status(202).json_body(data["response"].clone());
+    });
+    let current = server.mock(|when, then| {
+        when.method(GET)
+            .path("/api/v1/slack/connections")
+            .query_param("identity_id", identity.to_string());
+        then.status(200).json_body(data["detached"].clone());
+    });
+    let setup = server.mock(|when, then| {
+        when.method(POST)
+            .path("/api/v1/slack/applications/setup")
+            .json_body(json!({"identity_id": identity, "provisioning_workspace_id": workspace}));
+        then.status(202).json_body(json!({"status": "pending"}));
+    });
+    let poll = server.mock(|when, then| {
+        when.method(GET)
+            .path(format!("/api/v1/slack/applications/removals/{operation}"));
+        then.status(200).json_body(data["response"].clone());
+    });
+    client
+        .slack()
+        .remove_application(
+            identity,
+            2,
+            operation,
+            &SlackRemoveApplicationOptions::default(),
+        )
+        .unwrap();
+    remove.assert_hits(1);
+    setup.assert_hits(0);
+    let detached = client.slack().list_connections(identity).unwrap();
+    let detached_setup = detached.setup.unwrap();
+    assert_eq!(
+        detached_setup.status,
+        inkbox::SlackSetupState::NeedsCredentials
+    );
+    assert!(detached_setup.provisioning_workspace_id.is_none());
+    assert!(!detached.application_created);
+    current.assert_hits(1);
+    setup.assert_hits(0);
+    client.slack().start_setup(identity, workspace).unwrap();
+    setup.assert_hits(1);
+    assert_eq!(
+        client
+            .slack()
+            .get_application_removal(operation)
+            .unwrap()
+            .status,
+        SlackApplicationRemovalStatus::Removed
+    );
+    poll.assert_hits(1);
 }

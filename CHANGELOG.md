@@ -4,26 +4,27 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.7.23 - Slack app replacement (unreleased)
+## 0.7.23 - Slack app removal (unreleased)
 
 ### Added
 
-- Replace a Slack app for an existing identity with Python `replace_application`,
-  TypeScript `replaceApplication`, Rust `replace_application`, and CLI
-  `slack application replace`. Read progress with `get_replacement`,
-  `getReplacement`, or `slack application replacement`.
+- Remove an identity's Slack app through Python `remove_application`, TypeScript
+  `removeApplication`, Rust `remove_application`, and CLI `slack application remove`.
+  Read the removal result with `get_application_removal`, `getApplicationRemoval`,
+  or `slack application removal-status`.
 - Read `application_generation` / `applicationGeneration` from connection lists
-  and provide it with a request UUID to protect replacement retries.
-- Optional permanent deletion of the previous app, disabled by default, with
-  deletion outcomes reported independently of new-app preparation.
+  and provide it with a request UUID to protect removal retries.
+- Optional permanent deletion of the old app, disabled by default, with its own
+  deletion outcome. Confirmed already-deleted apps need no further deletion.
 
 ### Changed
 
-- Replacement requires organization management credentials, fresh app
-  authorization, and channel invitations. Previous connection history is no
-  longer accessible; the Inkbox identity and other channels are unchanged.
+- Removal requires organization management credentials and does not create a new
+  app. Connect again explicitly to choose a workspace, prepare a
+  fresh app, authorize it, and invite its bot to channels. Previous connection
+  history is no longer accessible; the Inkbox identity and other channels remain.
 - **Source-breaking for Rust struct literals:** add `application_generation: None`
-  to `SlackConnectionsResponse`. Deserializing older responses remains supported.
+  to `SlackConnectionsResponse`. Deserializing older responses still works.
 
 ## 0.7.22
 

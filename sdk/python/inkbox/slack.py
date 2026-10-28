@@ -48,11 +48,11 @@ class SlackConnectionsResponse:
 
 
 @dataclass
-class SlackApplicationReplacement:
-    """Replacement progress and the independent old-app deletion outcome."""
+class SlackApplicationRemoval:
+    """App removal and the independent optional deletion outcome."""
 
     operation_id: UUID
-    setup: SlackSetupStatus
+    status: Literal["removed"]
     deletion_status: Literal["not_requested", "pending", "deleted", "already_deleted", "failed", "unknown"]
     deletion_error_code: str | None = None
 
@@ -130,8 +130,6 @@ def _parse(cls, raw):
             data[key] = datetime.fromisoformat(data[key])
     if data.get("retry_at") is not None:
         data["retry_at"] = datetime.fromisoformat(data["retry_at"])
-    if cls is SlackApplicationReplacement:
-        data["setup"] = _parse(SlackSetupStatus, data["setup"])
     return cls(**data)
 
 
@@ -200,23 +198,24 @@ class SlackResource(SlackOperationsMixin):
             }
         ))
 
-    def replace_application(
+    def remove_application(
         self,
         identity_id: UUID | str,
         *,
         expected_application_generation: int,
         request_id: UUID | str,
         delete_old_app: bool = False,
-    ) -> SlackApplicationReplacement:
-        """Replace an app using organization management credentials.
+    ) -> SlackApplicationRemoval:
+        """Remove an app using organization management credentials.
 
         Read the current generation with ``list_connections``. Reuse the same
-        request ID and arguments after an uncertain request outcome. The new
-        app needs authorization; old connection history is no longer accessible.
-        Remote app deletion is optional and defaults to false.
+        request ID and arguments after an uncertain request outcome. No new app
+        is created. Previous connection history is no longer accessible.
+        Remote app deletion is optional and defaults to false. Connect again
+        explicitly to choose a workspace and create a fresh app.
         """
-        return _parse(SlackApplicationReplacement, self._http.post(
-            "/slack/applications/replace", json={
+        return _parse(SlackApplicationRemoval, self._http.post(
+            "/slack/applications/remove", json={
                 "identity_id": str(identity_id),
                 "expected_application_generation": expected_application_generation,
                 "request_id": str(request_id),
@@ -224,10 +223,10 @@ class SlackResource(SlackOperationsMixin):
             },
         ))
 
-    def get_replacement(self, operation_id: UUID | str) -> SlackApplicationReplacement:
-        """Read replacement progress using organization management credentials."""
-        return _parse(SlackApplicationReplacement, self._http.get(
-            f"/slack/applications/replacements/{quote(str(operation_id), safe='')}",
+    def get_application_removal(self, operation_id: UUID | str) -> SlackApplicationRemoval:
+        """Read removal and optional deletion progress with management credentials."""
+        return _parse(SlackApplicationRemoval, self._http.get(
+            f"/slack/applications/removals/{quote(str(operation_id), safe='')}",
         ))
 
     def start_installation(

@@ -80,26 +80,28 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
       `/api/v1/slack/connections?identity_id=${i}`,
     );
     const operationId = "33333333-3333-4333-8333-333333333333";
-    const replacement = { operation_id: operationId, setup: { status: "pending" },
+    const removal = { operation_id: operationId, status: "removed",
       deletion_status: "not_requested", deletion_error_code: null };
-    const replaced = await check(
-      ["slack", "application", "replace", "--identity-id", i,
+    const removed = await check(
+      ["slack", "application", "remove", "--identity-id", i,
         "--expected-application-generation", "2", "--request-id", operationId],
-      replacement, "POST", "/api/v1/slack/applications/replace",
+      removal, "POST", "/api/v1/slack/applications/remove",
       { identity_id: i, expected_application_generation: 2, request_id: operationId, delete_old_app: false },
     );
-    assert.equal(replaced.operationId, operationId);
-    assert.equal(replaced.deletionStatus, "not_requested");
+    assert.equal(removed.operationId, operationId);
+    assert.equal(removed.deletionStatus, "not_requested");
+    assert.equal(removed.status, "removed");
+    assert.equal(removed.setup, undefined);
     await check(
-      ["slack", "application", "replace", "--identity-id", i,
+      ["slack", "application", "remove", "--identity-id", i,
         "--expected-application-generation", "2", "--request-id", operationId, "--delete-old-app"],
-      { ...replacement, deletion_status: "pending" }, "POST", "/api/v1/slack/applications/replace",
+      { ...removal, deletion_status: "pending" }, "POST", "/api/v1/slack/applications/remove",
       { identity_id: i, expected_application_generation: 2, request_id: operationId, delete_old_app: true },
     );
     await check(
-      ["slack", "application", "replacement", "--operation-id", operationId],
-      { ...replacement, deletion_status: "already_deleted" }, "GET",
-      `/api/v1/slack/applications/replacements/${operationId}`,
+      ["slack", "application", "removal-status", "--operation-id", operationId],
+      { ...removal, deletion_status: "already_deleted" }, "GET",
+      `/api/v1/slack/applications/removals/${operationId}`,
     );
     const credentialsFile = path.join(tmp, "credentials.json");
     await writeFile(credentialsFile, JSON.stringify({ access_token: "synthetic-access", refresh_token: "synthetic-refresh" }), { mode: 0o600 });
@@ -357,12 +359,12 @@ test("identity-scoped Slack commands resolve handles and reject ambiguous select
   ];
   const cases = [
     {
-      args: ["application", "replace", "--expected-application-generation", "2",
+      args: ["application", "remove", "--expected-application-generation", "2",
         "--request-id", "33333333-3333-4333-8333-333333333333"],
       response: { operation_id: "33333333-3333-4333-8333-333333333333",
-        setup: { status: "pending" }, deletion_status: "not_requested", deletion_error_code: null },
+        status: "removed", deletion_status: "not_requested", deletion_error_code: null },
       method: "POST",
-      url: "/api/v1/slack/applications/replace",
+      url: "/api/v1/slack/applications/remove",
       body: { identity_id: identityId, expected_application_generation: 2,
         request_id: "33333333-3333-4333-8333-333333333333", delete_old_app: false },
     },
@@ -542,8 +544,8 @@ test("Slack CLI exposes retry delay and recovers by key without sending again", 
   }
 });
 
-test("Slack replacement requires explicit request identity and a positive app generation", async () => {
-  const args = ["--api-key", "synthetic-test-key", "slack", "application", "replace",
+test("Slack removal requires explicit request identity and a positive app generation", async () => {
+  const args = ["--api-key", "synthetic-test-key", "slack", "application", "remove",
     "--identity-id", "11111111-1111-4111-8111-111111111111"];
   const missingRequest = await run([...args, "--expected-application-generation", "1"]);
   assert.ok(missingRequest.error);
@@ -552,4 +554,10 @@ test("Slack replacement requires explicit request identity and a positive app ge
     "--request-id", "33333333-3333-4333-8333-333333333333"]);
   assert.ok(invalidGeneration.error);
   assert.match(invalidGeneration.stderr, /positive integer/);
+});
+
+test("Slack automatic app replacement command is unavailable", async () => {
+  const rejected = await run(["--api-key", "synthetic-test-key", "slack", "application", "replace"]);
+  assert.ok(rejected.error);
+  assert.match(rejected.stderr, /unknown command.*replace/);
 });

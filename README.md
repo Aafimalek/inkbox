@@ -664,11 +664,12 @@ Pausing the identity stops live operations and webhook delivery while preserving
 its connections and history. Workspace approval, connection ownership, and current
 conversation access remain required.
 
-Version **0.7.23** adds app replacement with organization management credentials.
-Read the app generation from the connection list, replace with a saved request
-UUID, and authorize the new bot. Previous connection history is no longer
-accessible through Inkbox. Optional permanent deletion of the old app defaults
-to off. See the SDK and CLI Slack sections above for method names and commands.
+Version **0.7.23** adds app removal with organization management credentials.
+Read the app generation from the connection list and remove with a saved request
+UUID. This does not create another app. Connect again explicitly when ready;
+you can choose a different workspace. Previous connection history
+is no longer accessible through Inkbox. Optional permanent deletion of the old app
+from Slack defaults to off. See the SDK and CLI Slack sections above.
 
 ## iMessage sender addresses
 
