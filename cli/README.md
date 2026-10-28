@@ -1136,8 +1136,10 @@ remote deletion. Removal never prepares or installs another app.
 When you choose to connect again, select a saved workspace or save configuration
 credentials for the workspace you want to use. Start `slack setup start`
 with that saved workspace ID, then authorize with `slack installation start` once
-setup is ready. Reusing a saved workspace requires configuration tokens from the
-account that created its apps; another workspace can use its own creator account.
+setup is ready. Selecting a ready saved workspace does not require entering tokens
+again. If you update its tokens while other agents still use that workspace, use
+configuration tokens from the original app creator. Another workspace can use its
+own creator account.
 Invite the new bot to channels again. Previous connection history
 is no longer accessible through Inkbox. The Inkbox identity, other channels,
 and runtime memory are unchanged. Claimed agent keys cannot remove apps or read
