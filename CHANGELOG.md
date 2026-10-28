@@ -14,6 +14,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   or `slack application removal-status`.
 - Read `application_generation` / `applicationGeneration` from connection lists
   and provide it with a request UUID to protect removal retries.
+- Read optional Slack account names (`user_name` / `userName`) on saved creator-scoped
+  workspace credentials. Multiple creators can have separate saved IDs in one workspace.
 - Removal always attempts permanent deletion of the old app, with a separate
   deletion outcome. Confirmed already-deleted apps need no further deletion.
 
@@ -24,7 +26,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   fresh app, authorize it, and invite its bot to channels. Previous connection
   history is no longer accessible; the Inkbox identity and other channels remain.
 - **Source-breaking for Rust struct literals:** add `application_generation: None`
-  to `SlackConnectionsResponse`. Deserializing older responses still works.
+  to `SlackConnectionsResponse` and `user_name: None` to `SlackProvisioningWorkspace`.
+  Deserializing older responses still works.
 
 ## 0.7.22
 

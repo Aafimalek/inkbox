@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import NotRequired, get_origin, get_type_hints
 
 import httpx
+import pytest
 
 from inkbox import ContactSlackAccount, Inkbox, SlackActorProfile, SlackSetupStatus, SlackWebhookData
 from inkbox.contacts.types import Contact
@@ -63,3 +64,34 @@ def test_needs_credentials_and_selected_workspace_parse():
     setup = _parse(SlackSetupStatus, {"status": "needs_credentials", "error_code": "credentials_required", "provisioning_workspace_id": None})
     assert setup.status == "needs_credentials"
     assert setup.provisioning_workspace_id is None
+
+
+@pytest.mark.parametrize("name_fields,expected_name", [
+    ({}, None), ({"user_name": None}, None), ({"user_name": "first-owner"}, "first-owner"),
+])
+def test_creator_scoped_workspace_metadata_is_optional_and_preserves_distinct_grants(name_fields, expected_name):
+    workspace = json.loads((Path(__file__).parents[3] / "tests/fixtures/slack.json").read_text())["provisioning_workspace"]
+    first = {**{key: value for key, value in workspace.items() if key != "user_name"}, **name_fields}
+    second = {**workspace, "id": "55555555-5555-4555-8555-555555555555",
+              "user_id": "USECOND", "user_name": "second-owner"}
+    requests = []
+
+    def handle(request):
+        requests.append(request)
+        if request.url.path.endswith("/connections"):
+            body = {"connections": [], "installation_available": False, "provisioning_workspace": first}
+        else:
+            body = {"workspaces": [first, second]} if request.method == "GET" else first
+        return httpx.Response(200, json=body)
+
+    with Inkbox(api_key="synthetic-test-key", base_url="https://example.com") as client:
+        client._api_http._client.close()
+        client._api_http._client = httpx.Client(base_url="https://example.com/api/v1", transport=httpx.MockTransport(handle))
+        rows = client.slack.list_provisioning_workspaces()
+        assert len(rows) == 2 and rows[0].workspace_id == rows[1].workspace_id
+        assert rows[0].id != rows[1].id and rows[0].user_id != rows[1].user_id
+        assert rows[0].user_name == expected_name and rows[1].user_name == "second-owner"
+        saved = client.slack.save_provisioning_workspace(access_token="synthetic-access", refresh_token="synthetic-refresh")
+        assert saved.user_name == expected_name
+        assert json.loads(requests[1].content) == {"access_token": "synthetic-access", "refresh_token": "synthetic-refresh"}
+        assert client.slack.list_connections(DATA["identity_id"]).provisioning_workspace.user_name == expected_name

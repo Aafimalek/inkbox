@@ -1,6 +1,6 @@
 //! Slack workspace setup, live reads, and durable sends.
 //! Slack enums reject unrecognized values; a newer SDK may be required.
-//! Outcome `Unknown` means uncertainty, not a catch-all.
+//! Outcome `Unknown` means terminal uncertainty, not a catch-all.
 use crate::error::{InkboxError, Result};
 use crate::http::{HttpTransport, NO_QUERY};
 use serde::{Deserialize, Serialize};
@@ -104,6 +104,8 @@ pub struct SlackProvisioningWorkspace {
     pub workspace_id: String,
     pub workspace_name: String,
     pub user_id: String,
+    #[serde(default)]
+    pub user_name: Option<String>,
     pub status: SlackProvisioningWorkspaceStatus,
     pub token_expires_at: Option<String>,
     pub created_at: String,

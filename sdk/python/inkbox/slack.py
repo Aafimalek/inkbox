@@ -67,6 +67,7 @@ class SlackProvisioningWorkspace:
     token_expires_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    user_name: str | None = None
 
 
 @dataclass

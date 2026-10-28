@@ -86,7 +86,14 @@ export function registerSlackCommands(program: Command): void {
     .description("List saved workspace metadata; no credentials are returned")
     .action(withErrorHandler(async function (this: Command) {
       const opts = getGlobalOpts(this);
-      output(await createClient(opts).slack.listProvisioningWorkspaces(), { json: !!opts.json });
+      const rows = await createClient(opts).slack.listProvisioningWorkspaces();
+      output(opts.json ? rows : rows.map((row) => ({
+        id: row.id,
+        workspace: row.workspaceName || row.workspaceId,
+        slackAccount: row.userName ? `@${row.userName}` : row.userId,
+        slackUserId: row.userId,
+        status: row.status,
+      })), { json: !!opts.json, columns: ["id", "workspace", "slackAccount", "slackUserId", "status"] });
     }));
   workspaces.command("save")
     .description("Verify and save configuration credentials for your organization")

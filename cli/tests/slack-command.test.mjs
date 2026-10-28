@@ -563,3 +563,41 @@ test("Slack removal no longer accepts a deletion toggle", async () => {
   assert.ok(rejected.error);
   assert.match(rejected.stderr, /unknown option.*--delete-old-app/);
 });
+
+test("Slack workspace table distinguishes creator names and IDs without changing JSON", async () => {
+  const legacy = { ...f.provisioning_workspace };
+  delete legacy.user_name;
+  const workspaces = [
+    { ...legacy, user_name: "first-owner" },
+    { ...legacy, id: "55555555-5555-4555-8555-555555555555", user_id: "USECOND", user_name: null },
+    { ...legacy, id: "66666666-6666-4666-8666-666666666666", user_id: "ULEGACY" },
+  ];
+  const requests = [];
+  const server = http.createServer((req, res) => {
+    requests.push({ method: req.method, url: req.url });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ workspaces }));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const globals = ["--api-key", "synthetic-test-key", "--base-url", `http://127.0.0.1:${server.address().port}`];
+  try {
+    const table = await run([...globals, "slack", "provisioning-workspace", "list"]);
+    assert.equal(table.error, null, table.stderr);
+    assert.match(table.stdout, /slackAccount\s+slackUserId/);
+    assert.match(table.stdout, /@first-owner\s+UEXAMPLE/);
+    assert.match(table.stdout, /USECOND\s+USECOND/);
+    assert.match(table.stdout, /ULEGACY\s+ULEGACY/);
+    for (const row of workspaces) assert.ok(table.stdout.includes(row.id) && table.stdout.includes(row.user_id));
+    const structured = await run([...globals, "--json", "slack", "provisioning-workspace", "list"]);
+    assert.equal(structured.error, null, structured.stderr);
+    const rows = JSON.parse(structured.stdout);
+    assert.equal(rows.length, 3);
+    assert.deepEqual(rows.map((row) => row.userName), ["first-owner", null, null]);
+    assert.equal(new Set(rows.map((row) => row.workspaceId)).size, 1);
+    assert.equal(new Set(rows.map((row) => row.id)).size, 3);
+    assert.ok(rows.every((row) => !("slackAccount" in row)));
+    assert.deepEqual(requests, Array(2).fill({ method: "GET", url: "/api/v1/slack/provisioning-workspaces" }));
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

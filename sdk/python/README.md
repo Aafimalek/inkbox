@@ -1980,8 +1980,12 @@ Claimed agent keys can prepare and install their own identity’s app.
 `installation_available` reports installation availability; `setup.status` reports
 preparation readiness. Save app-configuration credentials for
 the target workspace first; reuse that saved workspace for later identity apps.
-Credentials are write-only. The returned metadata identifies the verified workspace.
-An identity app stays bound to its selected workspace.
+Credentials are write-only. Saved records are scoped to the workspace and Slack
+creator: renewing the same creator keeps the saved ID; another creator receives a
+separate ID. Existing apps keep their original binding. Select by saved ID rather
+than workspace ID alone. Metadata includes `user_id` and optional `user_name`; use the user ID when the
+cached account name is missing.
+An identity app stays bound to its selected saved record.
 
 ```python
 import os
@@ -1992,7 +1996,7 @@ workspace = setup_client.slack.save_provisioning_workspace(
     access_token=os.environ["SLACK_CONFIGURATION_ACCESS_TOKEN"],
     refresh_token=os.environ["SLACK_CONFIGURATION_REFRESH_TOKEN"],
 )
-# For a workspace already saved, use list_provisioning_workspaces() and select its ID.
+# For a saved workspace and creator, use list_provisioning_workspaces() and select that record ID.
 setup = setup_client.slack.start_setup(identity_id, workspace.id)
 deadline = time.monotonic() + 120
 while setup.status == "pending" and time.monotonic() < deadline:

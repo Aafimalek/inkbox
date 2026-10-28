@@ -3,6 +3,7 @@ import type {
   SlackApplicationRemoval,
   SlackAppDeletionStatus,
   SlackRemoveApplicationOptions,
+  SlackProvisioningWorkspace,
 } from "../dist/index.js";
 
 declare const client: Inkbox;
@@ -27,3 +28,12 @@ void client.slack.removeApplication("11111111-1111-4111-8111-111111111111", { ..
 void result.then((value) => value.setup);
 // @ts-expect-error Automatic replacement is not part of this API.
 void client.slack.replaceApplication("11111111-1111-4111-8111-111111111111", options);
+
+// Older callers can still construct metadata without a cached account name.
+const legacyWorkspace: SlackProvisioningWorkspace = {
+  id: "44444444-4444-4444-8444-444444444444", workspaceId: "TEXAMPLE",
+  workspaceName: "Example", userId: "UEXAMPLE", status: "ready",
+  tokenExpiresAt: null, createdAt: new Date(), updatedAt: new Date(),
+};
+const namedWorkspace: SlackProvisioningWorkspace = { ...legacyWorkspace, userName: "example-owner" };
+void namedWorkspace;

@@ -48,6 +48,7 @@ export interface SlackProvisioningWorkspace {
   workspaceId: string;
   workspaceName: string;
   userId: string;
+  userName?: string | null;
   status: "ready" | "reauthorization_required";
   tokenExpiresAt: Date | null;
   createdAt: Date;
@@ -138,6 +139,7 @@ interface RawProvisioningWorkspace {
   workspace_id: string;
   workspace_name: string;
   user_id: string;
+  user_name?: string | null;
   status: SlackProvisioningWorkspace["status"];
   token_expires_at: string | null;
   created_at: string;
@@ -169,6 +171,7 @@ const provisioningWorkspace = (r: RawProvisioningWorkspace): SlackProvisioningWo
   workspaceId: r.workspace_id,
   workspaceName: r.workspace_name,
   userId: r.user_id,
+  userName: r.user_name ?? null,
   status: r.status,
   tokenExpiresAt: r.token_expires_at ? new Date(r.token_expires_at) : null,
   createdAt: new Date(r.created_at),
