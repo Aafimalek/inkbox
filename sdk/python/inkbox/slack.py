@@ -44,6 +44,17 @@ class SlackConnectionsResponse:
     setup: SlackSetupStatus | None = None
     application_created: bool = False
     provisioning_workspace: SlackProvisioningWorkspace | None = None
+    application_generation: int | None = None
+
+
+@dataclass
+class SlackApplicationRemoval:
+    """App removal and the independent remote deletion outcome."""
+
+    operation_id: UUID
+    status: Literal["removed"]
+    deletion_status: Literal["not_requested", "pending", "deleted", "already_deleted", "failed", "unknown"]
+    deletion_error_code: str | None = None
 
 
 @dataclass
@@ -56,6 +67,7 @@ class SlackProvisioningWorkspace:
     token_expires_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    user_name: str | None = None
 
 
 @dataclass
@@ -111,7 +123,7 @@ class SlackContactImportResponse:
 
 def _parse(cls, raw):
     data = {k: v for k, v in raw.items() if k in cls.__dataclass_fields__}
-    for key in ("id", "identity_id", "connection_id", "provisioning_workspace_id"):
+    for key in ("id", "identity_id", "connection_id", "provisioning_workspace_id", "operation_id"):
         if data.get(key) is not None and cls is not SlackFile:
             data[key] = UUID(data[key])
     for key in ("created_at", "updated_at", "expires_at", "token_expires_at"):
@@ -156,6 +168,7 @@ class SlackResource(SlackOperationsMixin):
             data["installation_available"],
             _parse(SlackSetupStatus, data["setup"]) if data.get("setup") is not None else None,
             application_created=data.get("application_created", False),
+            application_generation=data.get("application_generation"),
             provisioning_workspace=_parse(SlackProvisioningWorkspace, data["provisioning_workspace"])
             if data.get("provisioning_workspace") is not None else None,
         )
@@ -184,6 +197,35 @@ class SlackResource(SlackOperationsMixin):
                 "identity_id": str(identity_id),
                 "provisioning_workspace_id": str(provisioning_workspace_id),
             }
+        ))
+
+    def remove_application(
+        self,
+        identity_id: UUID | str,
+        *,
+        expected_application_generation: int,
+        request_id: UUID | str,
+    ) -> SlackApplicationRemoval:
+        """Remove an app using organization management credentials.
+
+        Read the current generation with ``list_connections``. Reuse the same
+        request ID and arguments after an uncertain request outcome. No new app
+        is created. Previous connection history is no longer accessible.
+        Removal always attempts permanent deletion of the old app from Slack.
+        Connect again explicitly to choose a workspace and create a fresh app.
+        """
+        return _parse(SlackApplicationRemoval, self._http.post(
+            "/slack/applications/remove", json={
+                "identity_id": str(identity_id),
+                "expected_application_generation": expected_application_generation,
+                "request_id": str(request_id),
+            },
+        ))
+
+    def get_application_removal(self, operation_id: UUID | str) -> SlackApplicationRemoval:
+        """Read removal and remote deletion progress with management credentials."""
+        return _parse(SlackApplicationRemoval, self._http.get(
+            f"/slack/applications/removals/{quote(str(operation_id), safe='')}",
         ))
 
     def start_installation(

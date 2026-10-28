@@ -118,3 +118,58 @@ fn missing_credentials_and_workspace_metadata_parse() {
         "TEXAMPLE"
     );
 }
+
+#[test]
+fn creator_scoped_workspace_names_are_optional_without_collapsing_grants() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../../tests/fixtures/slack.json")).unwrap();
+    for name in [None, Some(Value::Null), Some(json!("first-owner"))] {
+        let mut first = fixture["provisioning_workspace"].clone();
+        first.as_object_mut().unwrap().remove("user_name");
+        if let Some(value) = name {
+            first["user_name"] = value;
+        }
+        let mut second = first.clone();
+        second["id"] = json!("55555555-5555-4555-8555-555555555555");
+        second["user_id"] = json!("USECOND");
+        second["user_name"] = json!("second-owner");
+        let server = MockServer::start();
+        let client = Inkbox::builder("synthetic-test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let list = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/slack/provisioning-workspaces");
+            then.status(200)
+                .json_body(json!({"workspaces": [first, second]}));
+        });
+        let rows = client.slack().list_provisioning_workspaces().unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].workspace_id, rows[1].workspace_id);
+        assert_ne!(rows[0].id, rows[1].id);
+        assert_ne!(rows[0].user_id, rows[1].user_id);
+        assert_eq!(rows[0].user_name.as_deref(), first["user_name"].as_str());
+        assert_eq!(rows[1].user_name.as_deref(), Some("second-owner"));
+        list.assert();
+        let save = server.mock(|when, then| {
+            when.method(POST).path("/api/v1/slack/provisioning-workspaces")
+                .json_body(json!({"access_token": "synthetic-access", "refresh_token": "synthetic-refresh"}));
+            then.status(200).json_body(first.clone());
+        });
+        let saved = client
+            .slack()
+            .save_provisioning_workspace("synthetic-access", "synthetic-refresh")
+            .unwrap();
+        assert_eq!(saved.user_name.as_deref(), first["user_name"].as_str());
+        save.assert();
+        let parsed: inkbox::SlackConnectionsResponse = serde_json::from_value(json!({
+            "connections": [], "installation_available": false, "provisioning_workspace": first
+        }))
+        .unwrap();
+        assert_eq!(
+            parsed.provisioning_workspace.unwrap().user_name,
+            saved.user_name
+        );
+    }
+}

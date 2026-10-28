@@ -1923,6 +1923,20 @@ inkbox.mailboxes.update("alex@example.com", signature_enabled=False)
 
 ## Slack
 
+With organization management credentials, use `client.slack.remove_application`
+to remove an identity's app without creating another. Supply `expected_application_generation`
+from `list_connections` and a `request_id` UUID; reuse both with identical arguments
+when retrying an uncertain request. Removal always attempts permanent deletion of
+the old app from Slack. Read removal and remote deletion progress with
+`get_application_removal`. Already-deleted apps need no further deletion.
+The result has `status` set to `removed` and does not include new-app setup.
+
+When ready, connect again explicitly: choose a saved workspace or save credentials
+for the workspace you choose, prepare the new app, authorize it,
+and invite its bot to channels. Previous connection history is no longer
+accessible through Inkbox; the identity and other channels are unchanged.
+Claimed agent keys cannot remove apps or read removal progress.
+
 Slack contact rules support exact people and home workspaces, with whitelist or
 blacklist defaults and optional per-direction settings. Import visible people
 into real contact cards and use Slack with Companion mode. Importing a contact does not allow communication.
@@ -1966,8 +1980,12 @@ Claimed agent keys can prepare and install their own identity’s app.
 `installation_available` reports installation availability; `setup.status` reports
 preparation readiness. Save app-configuration credentials for
 the target workspace first; reuse that saved workspace for later identity apps.
-Credentials are write-only. The returned metadata identifies the verified workspace.
-An identity app stays bound to its selected workspace.
+Credentials are write-only. Saved records are scoped to the workspace and Slack
+creator: renewing the same creator keeps the saved ID; another creator receives a
+separate ID. Existing apps keep their original binding. Select by saved ID rather
+than workspace ID alone. Metadata includes `user_id` and optional `user_name`; use the user ID when the
+cached account name is missing.
+An identity app stays bound to its selected saved record.
 
 ```python
 import os
@@ -1978,7 +1996,7 @@ workspace = setup_client.slack.save_provisioning_workspace(
     access_token=os.environ["SLACK_CONFIGURATION_ACCESS_TOKEN"],
     refresh_token=os.environ["SLACK_CONFIGURATION_REFRESH_TOKEN"],
 )
-# For a workspace already saved, use list_provisioning_workspaces() and select its ID.
+# For a saved workspace and creator, use list_provisioning_workspaces() and select that record ID.
 setup = setup_client.slack.start_setup(identity_id, workspace.id)
 deadline = time.monotonic() + 120
 while setup.status == "pending" and time.monotonic() < deadline:

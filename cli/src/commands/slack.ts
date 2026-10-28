@@ -86,7 +86,14 @@ export function registerSlackCommands(program: Command): void {
     .description("List saved workspace metadata; no credentials are returned")
     .action(withErrorHandler(async function (this: Command) {
       const opts = getGlobalOpts(this);
-      output(await createClient(opts).slack.listProvisioningWorkspaces(), { json: !!opts.json });
+      const rows = await createClient(opts).slack.listProvisioningWorkspaces();
+      output(opts.json ? rows : rows.map((row) => ({
+        id: row.id,
+        workspace: row.workspaceName || row.workspaceId,
+        slackAccount: row.userName ? `@${row.userName}` : row.userId,
+        slackUserId: row.userId,
+        status: row.status,
+      })), { json: !!opts.json, columns: ["id", "workspace", "slackAccount", "slackUserId", "status"] });
     }));
   workspaces.command("save")
     .description("Verify and save configuration credentials for your organization")
@@ -115,6 +122,30 @@ export function registerSlackCommands(program: Command): void {
         });
       }),
     );
+  const applications = slack.command("application")
+    .description("Remove a Slack app with organization management credentials");
+  identity(applications.command("remove"))
+    .description("Remove the app without creating another; connect again explicitly when ready")
+    .requiredOption("--expected-application-generation <n>", "Current application generation from connection list", slackInteger)
+    .requiredOption("--request-id <uuid>", "Request UUID; reuse with identical arguments when retrying")
+    .action(withErrorHandler(async function (
+      this: Command,
+      o: IdentityOptions & { expectedApplicationGeneration: number; requestId: string },
+    ) {
+      const opts = getGlobalOpts(this);
+      const client = createClient(opts);
+      output(await client.slack.removeApplication(await resolveIdentityId(client, o), {
+        expectedApplicationGeneration: o.expectedApplicationGeneration,
+        requestId: o.requestId,
+      }), { json: !!opts.json });
+    }));
+  applications.command("removal-status")
+    .description("Read removal and remote deletion progress")
+    .requiredOption("--operation-id <uuid>", "Operation UUID returned by application remove")
+    .action(withErrorHandler(async function (this: Command, o: { operationId: string }) {
+      const opts = getGlobalOpts(this);
+      output(await createClient(opts).slack.getApplicationRemoval(o.operationId), { json: !!opts.json });
+    }));
   page(identity(slack.command("search")))
     .description(
       "Search retained messages across an identity's workspaces; agent credentials infer identity",

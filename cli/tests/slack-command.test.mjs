@@ -79,6 +79,24 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
       "GET",
       `/api/v1/slack/connections?identity_id=${i}`,
     );
+    const operationId = "33333333-3333-4333-8333-333333333333";
+    const removal = { operation_id: operationId, status: "removed",
+      deletion_status: "pending", deletion_error_code: null };
+    const removed = await check(
+      ["slack", "application", "remove", "--identity-id", i,
+        "--expected-application-generation", "2", "--request-id", operationId],
+      removal, "POST", "/api/v1/slack/applications/remove",
+      { identity_id: i, expected_application_generation: 2, request_id: operationId },
+    );
+    assert.equal(removed.operationId, operationId);
+    assert.equal(removed.deletionStatus, "pending");
+    assert.equal(removed.status, "removed");
+    assert.equal(removed.setup, undefined);
+    await check(
+      ["slack", "application", "removal-status", "--operation-id", operationId],
+      { ...removal, deletion_status: "already_deleted" }, "GET",
+      `/api/v1/slack/applications/removals/${operationId}`,
+    );
     const credentialsFile = path.join(tmp, "credentials.json");
     await writeFile(credentialsFile, JSON.stringify({ access_token: "synthetic-access", refresh_token: "synthetic-refresh" }), { mode: 0o600 });
     const workspace = await check(
@@ -256,7 +274,7 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
       `/api/v1/webhooks/subscriptions/${f.subscription.id}`,
       { url: "https://example.com/new" },
     );
-    assert.equal(requests.length, 26);
+    assert.equal(requests.length, 28);
     const rejected = await run([
       ...globals,
       "slack",
@@ -271,7 +289,7 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
     ]);
     assert.ok(rejected.error);
     assert.match(rejected.stderr, /idempotency-key/);
-    assert.equal(requests.length, 26);
+    assert.equal(requests.length, 28);
     const missingRecipient = await run([
       ...globals,
       "slack",
@@ -282,7 +300,7 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
     ]);
     assert.ok(missingRecipient.error);
     assert.match(missingRecipient.stderr, /required option.*--user-id/);
-    assert.equal(requests.length, 26);
+    assert.equal(requests.length, 28);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await rm(tmp, { recursive: true, force: true });
@@ -334,6 +352,16 @@ test("identity-scoped Slack commands resolve handles and reject ambiguous select
     "slack",
   ];
   const cases = [
+    {
+      args: ["application", "remove", "--expected-application-generation", "2",
+        "--request-id", "33333333-3333-4333-8333-333333333333"],
+      response: { operation_id: "33333333-3333-4333-8333-333333333333",
+        status: "removed", deletion_status: "pending", deletion_error_code: null },
+      method: "POST",
+      url: "/api/v1/slack/applications/remove",
+      body: { identity_id: identityId, expected_application_generation: 2,
+        request_id: "33333333-3333-4333-8333-333333333333" },
+    },
     {
       args: ["setup", "start", "--provisioning-workspace-id", f.provisioning_workspace.id],
       response: { status: "ready", retry_at: null, error_code: null },
@@ -506,6 +534,56 @@ test("Slack CLI exposes retry delay and recovers by key without sending again", 
     assert.equal(requests[2].method, "GET");
   } finally {
     server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("Slack removal requires explicit request identity and a positive app generation", async () => {
+  const args = ["--api-key", "synthetic-test-key", "slack", "application", "remove",
+    "--identity-id", "11111111-1111-4111-8111-111111111111"];
+  const missingRequest = await run([...args, "--expected-application-generation", "1"]);
+  assert.ok(missingRequest.error);
+  assert.match(missingRequest.stderr, /request-id/);
+  const invalidGeneration = await run([...args, "--expected-application-generation", "0",
+    "--request-id", "33333333-3333-4333-8333-333333333333"]);
+  assert.ok(invalidGeneration.error);
+  assert.match(invalidGeneration.stderr, /positive integer/);
+});
+
+test("Slack workspace table distinguishes creator names and IDs without changing JSON", async () => {
+  const legacy = { ...f.provisioning_workspace };
+  delete legacy.user_name;
+  const workspaces = [
+    { ...legacy, user_name: "first-owner" },
+    { ...legacy, id: "55555555-5555-4555-8555-555555555555", user_id: "USECOND", user_name: null },
+    { ...legacy, id: "66666666-6666-4666-8666-666666666666", user_id: "ULEGACY" },
+  ];
+  const requests = [];
+  const server = http.createServer((req, res) => {
+    requests.push({ method: req.method, url: req.url });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ workspaces }));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const globals = ["--api-key", "synthetic-test-key", "--base-url", `http://127.0.0.1:${server.address().port}`];
+  try {
+    const table = await run([...globals, "slack", "provisioning-workspace", "list"]);
+    assert.equal(table.error, null, table.stderr);
+    assert.match(table.stdout, /slackAccount\s+slackUserId/);
+    assert.match(table.stdout, /@first-owner\s+UEXAMPLE/);
+    assert.match(table.stdout, /USECOND\s+USECOND/);
+    assert.match(table.stdout, /ULEGACY\s+ULEGACY/);
+    for (const row of workspaces) assert.ok(table.stdout.includes(row.id) && table.stdout.includes(row.user_id));
+    const structured = await run([...globals, "--json", "slack", "provisioning-workspace", "list"]);
+    assert.equal(structured.error, null, structured.stderr);
+    const rows = JSON.parse(structured.stdout);
+    assert.equal(rows.length, 3);
+    assert.deepEqual(rows.map((row) => row.userName), ["first-owner", null, null]);
+    assert.equal(new Set(rows.map((row) => row.workspaceId)).size, 1);
+    assert.equal(new Set(rows.map((row) => row.id)).size, 3);
+    assert.ok(rows.every((row) => !("slackAccount" in row)));
+    assert.deepEqual(requests, Array(2).fill({ method: "GET", url: "/api/v1/slack/provisioning-workspaces" }));
+  } finally {
     await new Promise((resolve) => server.close(resolve));
   }
 });

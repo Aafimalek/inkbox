@@ -1,6 +1,6 @@
 //! Slack workspace setup, live reads, and durable sends.
 //! Slack enums reject unrecognized values; a newer SDK may be required.
-//! Action/operation `Unknown` means terminal uncertainty, not a catch-all.
+//! Outcome `Unknown` means terminal uncertainty, not a catch-all.
 use crate::error::{InkboxError, Result};
 use crate::http::{HttpTransport, NO_QUERY};
 use serde::{Deserialize, Serialize};
@@ -45,7 +45,32 @@ pub struct SlackConnectionsResponse {
     #[serde(default)]
     pub application_created: bool,
     #[serde(default)]
+    pub application_generation: Option<u64>,
+    #[serde(default)]
     pub provisioning_workspace: Option<SlackProvisioningWorkspace>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SlackAppDeletionStatus {
+    NotRequested,
+    Pending,
+    Deleted,
+    AlreadyDeleted,
+    Failed,
+    Unknown,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SlackApplicationRemovalStatus {
+    Removed,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackApplicationRemoval {
+    pub operation_id: Uuid,
+    pub status: SlackApplicationRemovalStatus,
+    pub deletion_status: SlackAppDeletionStatus,
+    #[serde(default)]
+    pub deletion_error_code: Option<String>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -79,6 +104,8 @@ pub struct SlackProvisioningWorkspace {
     pub workspace_id: String,
     pub workspace_name: String,
     pub user_id: String,
+    #[serde(default)]
+    pub user_name: Option<String>,
     pub status: SlackProvisioningWorkspaceStatus,
     pub token_expires_at: Option<String>,
     pub created_at: String,
@@ -242,6 +269,33 @@ impl SlackResource {
         Ok(serde_json::from_value(self.http.post(
             "/slack/applications/setup",
             Some(&json!({"identity_id": identity_id, "provisioning_workspace_id": provisioning_workspace_id})),
+            NO_QUERY,
+        )?)?)
+    }
+    /// Remove an app with management credentials without creating a new app.
+    /// Reuse request_id and arguments after an uncertain outcome. Previous connection
+    /// history is no longer accessible. Removal always attempts remote deletion.
+    /// Connect again explicitly to choose a workspace and create a fresh app.
+    pub fn remove_application(
+        &self,
+        identity_id: Uuid,
+        expected_application_generation: u64,
+        request_id: Uuid,
+    ) -> Result<SlackApplicationRemoval> {
+        Ok(serde_json::from_value(self.http.post(
+            "/slack/applications/remove",
+            Some(&json!({
+                "identity_id": identity_id,
+                "expected_application_generation": expected_application_generation,
+                "request_id": request_id,
+            })),
+            NO_QUERY,
+        )?)?)
+    }
+    /// Read removal and remote deletion progress with management credentials.
+    pub fn get_application_removal(&self, operation_id: Uuid) -> Result<SlackApplicationRemoval> {
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/slack/applications/removals/{operation_id}"),
             NO_QUERY,
         )?)?)
     }
