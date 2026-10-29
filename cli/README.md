@@ -1103,6 +1103,7 @@ lookup; the UUID form avoids that lookup.
 | Command group | Operations |
 | --- | --- |
 | `slack setup` | `start` (preparation status is returned by `connection list`) |
+| `slack application` | `remove`, `removal-status --operation-id <uuid>` |
 | `slack search` | Search retained messages across an identity's workspace connections |
 | `slack contact-rule` | `list`, `list-all`, `get`, `create`, `update`, `delete` |
 | `slack contacts-import` | Import one page of directory or selected conversation members into contact cards; organization admin API key required |
@@ -1112,6 +1113,45 @@ lookup; the UUID form avoids that lookup.
 | `slack message` | `list`, `send` |
 | `slack action` | `get <action-id>`, `get-by-key --idempotency-key <key>` |
 | `slack file` | `get <file-id>`, `download <file-id>`, `preview <file-id>` |
+
+To remove an identity's app, use an organization admin API key:
+
+```bash
+inkbox slack connection list --identity example-agent
+# Confirm applicationCreated is true. Save its applicationGeneration, not a connection generation.
+application_generation=1 # Replace with the returned current value.
+request_id="$(uuidgen)" # Generate once; save both values before removal and reuse them for retries.
+inkbox slack application remove --identity example-agent \
+  --expected-application-generation "$application_generation" \
+  --request-id "$request_id"
+inkbox slack application removal-status --operation-id "$request_id"
+```
+
+Save the request ID and generation before removing. Retry with the same ID and
+identical arguments after an uncertain request outcome. Removal always attempts
+permanent deletion of the old app from Slack; there is no deletion toggle.
+The result reports `status: removed` and a separate deletion outcome. Confirmed
+already absent is successful; credential errors and timeouts are not proof of
+remote deletion. Removal never prepares or installs another app. Poll while
+`deletionStatus` is `pending`, even if `deletionErrorCode` is `credentials_busy`.
+`failed` and `unknown` are final for that operation; replaying it does not retry
+remote deletion. Check the original app in Slack and, if needed, delete it there
+with its original creator's access. Verify it is the old app, not a newly created one.
+
+When you choose to connect again, select a saved workspace or save configuration
+credentials for the workspace you want to use. Start `slack setup start`
+with that saved workspace ID, then authorize with `slack installation start` once
+setup is ready. Selecting a ready saved workspace does not require entering tokens
+again. Saving a valid token pair renews that creator's saved credentials without
+changing their saved ID. A different creator in the same workspace gets a separate
+saved ID; existing apps stay on their original creator's credentials. Select the
+returned saved ID when preparing a new app. The workspace list shows the Slack
+account and user ID separately. Cached account names can be missing; the user ID
+is the fallback.
+Invite the new bot to channels again. Previous connection history
+is no longer accessible through Inkbox. The Inkbox identity, other channels,
+and runtime memory are unchanged. Claimed agent keys cannot remove apps or read
+removal progress.
 
 All conversation/message/action/file operations require `--connection-id`.
 Use `--conversation-id` for an existing conversation, `--thread-ts` for a thread,

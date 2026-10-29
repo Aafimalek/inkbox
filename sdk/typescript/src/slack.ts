@@ -22,6 +22,7 @@ export interface SlackConnectionsResponse {
   setup?: SlackSetupStatus | null;
   /** App existence, independent of identity enablement or workspace connections. */
   applicationCreated?: boolean;
+  applicationGeneration?: number | null;
   provisioningWorkspace?: SlackProvisioningWorkspace | null;
 }
 export interface SlackSetupStatus {
@@ -30,11 +31,24 @@ export interface SlackSetupStatus {
   errorCode: "setup_failed" | "outcome_unknown" | "quota_exceeded" | "credentials_required" | null;
   provisioningWorkspaceId: string | null;
 }
+export type SlackAppDeletionStatus =
+  "not_requested" | "pending" | "deleted" | "already_deleted" | "failed" | "unknown";
+export interface SlackApplicationRemoval {
+  operationId: string;
+  status: "removed";
+  deletionStatus: SlackAppDeletionStatus;
+  deletionErrorCode: string | null;
+}
+export interface SlackRemoveApplicationOptions {
+  expectedApplicationGeneration: number;
+  requestId: string;
+}
 export interface SlackProvisioningWorkspace {
   id: string;
   workspaceId: string;
   workspaceName: string;
   userId: string;
+  userName?: string | null;
   status: "ready" | "reauthorization_required";
   tokenExpiresAt: Date | null;
   createdAt: Date;
@@ -108,11 +122,24 @@ const setupStatus = (r: RawSetupStatus): SlackSetupStatus => ({
   errorCode: r.error_code ?? null,
   provisioningWorkspaceId: r.provisioning_workspace_id ?? null,
 });
+interface RawApplicationRemoval {
+  operation_id: string;
+  status: SlackApplicationRemoval["status"];
+  deletion_status: SlackAppDeletionStatus;
+  deletion_error_code?: string | null;
+}
+const applicationRemoval = (r: RawApplicationRemoval): SlackApplicationRemoval => ({
+  operationId: r.operation_id,
+  status: r.status,
+  deletionStatus: r.deletion_status,
+  deletionErrorCode: r.deletion_error_code ?? null,
+});
 interface RawProvisioningWorkspace {
   id: string;
   workspace_id: string;
   workspace_name: string;
   user_id: string;
+  user_name?: string | null;
   status: SlackProvisioningWorkspace["status"];
   token_expires_at: string | null;
   created_at: string;
@@ -144,6 +171,7 @@ const provisioningWorkspace = (r: RawProvisioningWorkspace): SlackProvisioningWo
   workspaceId: r.workspace_id,
   workspaceName: r.workspace_name,
   userId: r.user_id,
+  userName: r.user_name ?? null,
   status: r.status,
   tokenExpiresAt: r.token_expires_at ? new Date(r.token_expires_at) : null,
   createdAt: new Date(r.created_at),
@@ -216,6 +244,7 @@ export class SlackResource extends SlackOperationsResource {
       installation_available: boolean;
       setup?: RawSetupStatus | null;
       application_created?: boolean;
+      application_generation?: number | null;
       provisioning_workspace?: RawProvisioningWorkspace | null;
     }>("/slack/connections", { identity_id: identityId });
     return {
@@ -223,6 +252,7 @@ export class SlackResource extends SlackOperationsResource {
       installationAvailable: r.installation_available,
       setup: r.setup ? setupStatus(r.setup) : null,
       applicationCreated: r.application_created ?? false,
+      applicationGeneration: r.application_generation ?? null,
       provisioningWorkspace: r.provisioning_workspace ? provisioningWorkspace(r.provisioning_workspace) : null,
     };
   }
@@ -252,6 +282,32 @@ export class SlackResource extends SlackOperationsResource {
         identity_id: identityId,
         provisioning_workspace_id: provisioningWorkspaceId,
       },
+    ));
+  }
+  /** Remove an app with organization management credentials; no new app is created.
+   * Reuse requestId and arguments after an uncertain outcome. Previous connection history
+   * is no longer accessible. Removal always attempts remote deletion. Connect again
+   * explicitly to choose a workspace and create a fresh app. */
+  async removeApplication(
+    identityId: string,
+    options: SlackRemoveApplicationOptions,
+  ): Promise<SlackApplicationRemoval> {
+    if (!options || typeof options !== "object" || Array.isArray(options)
+        || Object.keys(options).some((key) => key !== "expectedApplicationGeneration" && key !== "requestId")) {
+      throw new TypeError("Provide expectedApplicationGeneration and requestId only.");
+    }
+    return applicationRemoval(await this.http.post<RawApplicationRemoval>(
+      "/slack/applications/remove", {
+        identity_id: identityId,
+        expected_application_generation: options.expectedApplicationGeneration,
+        request_id: options.requestId,
+      },
+    ));
+  }
+  /** Read removal and remote deletion progress with management credentials. */
+  async getApplicationRemoval(operationId: string): Promise<SlackApplicationRemoval> {
+    return applicationRemoval(await this.http.get<RawApplicationRemoval>(
+      `/slack/applications/removals/${encodeURIComponent(operationId)}`,
     ));
   }
   /** Removes Inkbox authority; does not uninstall the Slack app. */

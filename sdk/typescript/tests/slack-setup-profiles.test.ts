@@ -50,3 +50,28 @@ it("reports missing credentials with no selected workspace", async () => {
   expect(result.setup).toMatchObject({ status: "needs_credentials", errorCode: "credentials_required", provisioningWorkspaceId: null });
   expect(result.provisioningWorkspace).toBeNull();
 });
+
+
+it.each([{}, { user_name: null }, { user_name: "first-owner" }])("preserves creator-scoped grants with optional account names %j", async (nameFields) => {
+  const fixture = JSON.parse(readFileSync(new URL("../../../tests/fixtures/slack.json", import.meta.url), "utf8"));
+  const first = { ...fixture.provisioning_workspace };
+  delete first.user_name;
+  Object.assign(first, nameFields);
+  const second = { ...fixture.provisioning_workspace, id: "55555555-5555-4555-8555-555555555555", user_id: "USECOND", user_name: "second-owner" };
+  const fetch = vi.fn<typeof globalThis.fetch>();
+  vi.stubGlobal("fetch", fetch);
+  const client = new Inkbox({ apiKey: "synthetic-test-key", baseUrl: "https://example.com" });
+  fetch.mockResolvedValueOnce(new Response(JSON.stringify({ workspaces: [first, second] })));
+  const rows = await client.slack.listProvisioningWorkspaces();
+  expect(rows).toHaveLength(2);
+  expect(rows[0].workspaceId).toBe(rows[1].workspaceId);
+  expect(rows[0].id).not.toBe(rows[1].id);
+  expect(rows[0].userId).not.toBe(rows[1].userId);
+  expect(rows[0].userName).toBe(first.user_name ?? null);
+  expect(rows[1].userName).toBe("second-owner");
+  fetch.mockResolvedValueOnce(new Response(JSON.stringify(first)));
+  expect((await client.slack.saveProvisioningWorkspace({ accessToken: "synthetic-access", refreshToken: "synthetic-refresh" })).userName).toBe(first.user_name ?? null);
+  expect(JSON.parse(String(fetch.mock.calls[1][1]?.body))).toEqual({ access_token: "synthetic-access", refresh_token: "synthetic-refresh" });
+  fetch.mockResolvedValueOnce(new Response(JSON.stringify({ connections: [], installation_available: false, provisioning_workspace: first })));
+  expect((await client.slack.listConnections(data.identity_id)).provisioningWorkspace?.userName).toBe(first.user_name ?? null);
+});
