@@ -17,6 +17,7 @@ import asyncio
 import datetime
 import ssl
 from typing import AsyncIterator
+from uuid import uuid4
 
 import pytest
 from cryptography import x509
@@ -35,8 +36,10 @@ from inkbox.tunnels.client._dispatch import (
 def _make_self_signed(common_name: str) -> tuple[bytes, bytes]:
     """Return (cert_pem, key_pem) for a self-signed cert valid 1 year."""
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    # A unique issuer avoids colliding with an existing localhost certificate
+    # in the system trust store. The SAN below still verifies the actual host.
     subject = issuer = x509.Name([
-        x509.NameAttribute(NameOID.COMMON_NAME, common_name),
+        x509.NameAttribute(NameOID.COMMON_NAME, f"inkbox-test-{uuid4()}"),
     ])
     now = datetime.datetime.now(datetime.timezone.utc)
     cert = (
@@ -244,6 +247,45 @@ async def test_https_upstream_with_explicit_ca_bundle_succeeds():
             await dispatch.dispatch(request, sink)
             assert sink.head is not None
             assert sink.head.status == 200
+        finally:
+            await dispatch.aclose()
+    finally:
+        serve.cancel()
+        try:
+            await serve
+        except (asyncio.CancelledError, Exception):
+            pass
+        server.close()
+        await server.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_https_upstream_with_wrong_ca_bundle_returns_502():
+    """Reject an upstream certificate that is not in the supplied CA bundle."""
+    cert_pem, key_pem = _make_self_signed("localhost")
+    other_cert_pem, _ = _make_self_signed("localhost")
+    port_holder: list[int] = []
+    sni_holder: list[str | None] = []
+    server = await _start_https_echo(
+        cert_pem, key_pem, port_holder, sni_holder,
+    )
+    serve = asyncio.create_task(server.serve_forever())
+    try:
+        dispatch = UpstreamUrlDispatch(
+            forward_to=f"https://localhost:{port_holder[0]}",
+            public_host="agent.test",
+            max_outbound_body_bytes=1_000_000,
+            max_inbound_body_bytes=1_000_000,
+            ca_bundle=other_cert_pem,
+        )
+        try:
+            sink = _CapturingSink()
+            request = DispatchRequest(
+                method="GET", path="/", headers=[], body=_empty_body(),
+            )
+            await dispatch.dispatch(request, sink)
+            assert sink.head is not None
+            assert sink.head.status == 502
         finally:
             await dispatch.aclose()
     finally:
